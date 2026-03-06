@@ -1,0 +1,124 @@
+{
+  "projectType": "frontend",
+  "projectName": "Wildlife Watcher Mobile App",
+  "projectDescription": "React Native mobile app for communicating with Wildlife Watcher cameras via Bluetooth to manage wildlife monitoring devices and observations",
+  "theme": "almond",
+  "primaryColor": "#fc0404",
+  "lightColor": "#fc7c7c",
+  "darkColor": null,
+  "navigation": {
+    "tabs": [
+      {
+        "tab": "Documentation",
+        "groups": [
+          {
+            "group": "Get Started",
+            "pages": [
+              "introduction",
+              "installation",
+              "quickstart"
+            ]
+          },
+          {
+            "group": "Core Features",
+            "pages": [
+              "features/ble-communication",
+              "features/device-management",
+              "features/projects-deployments",
+              "features/maps-observations",
+              "features/firmware-updates"
+            ]
+          },
+          {
+            "group": "Development",
+            "pages": [
+              "development/project-structure",
+              "development/state-management",
+              "development/api-integration",
+              "development/navigation"
+            ]
+          },
+          {
+            "group": "Guides",
+            "pages": [
+              "guides/configuration",
+              "guides/authentication",
+              "guides/permissions",
+              "guides/troubleshooting"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "Components",
+        "groups": [
+          {
+            "group": "UI Components",
+            "pages": [
+              "components/overview",
+              "components/buttons",
+              "components/inputs",
+              "components/layout",
+              "components/feedback"
+            ]
+          },
+          {
+            "group": "BLE Components",
+            "pages": [
+              "components/ble/commands",
+              "components/ble/hooks",
+              "components/ble/providers"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "API Reference",
+        "groups": [
+          {
+            "group": "Redux API",
+            "pages": [
+              "api/overview",
+              "api/auth",
+              "api/devices",
+              "api/projects",
+              "api/deployments",
+              "api/observations",
+              "api/media"
+            ]
+          },
+          {
+            "group": "Hooks",
+            "pages": [
+              "api/hooks/use-ble",
+              "api/hooks/use-command",
+              "api/hooks/use-permissions",
+              "api/hooks/use-navigation"
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "keyFeatures": [
+    "Bluetooth Low Energy device scanning and connection",
+    "Wildlife camera device management and configuration",
+    "Project and deployment tracking with map integration",
+    "Firmware over-the-air updates (DFU)",
+    "Real-time sensor data and observations",
+    "OAuth authentication and user management",
+    "Offline-capable data synchronization"
+  ],
+  "publicApiSurface": [
+    "useBle() - BLE connection and communication hook",
+    "useCommand() - Device command execution hook",
+    "useBleActions() - BLE provider context",
+    "devicesApi - RTK Query API for device management",
+    "projectsApi - RTK Query API for project management",
+    "deploymentsApi - RTK Query API for deployment tracking",
+    "observationsApi - RTK Query API for wildlife observations",
+    "CommandNames - Available device commands (ID, VERSION, BATTERY, SENSOR, etc.)",
+    "DfuService - Firmware update service",
+    "WWButton, WWText, WWIcon - UI component library"
+  ]
+}
