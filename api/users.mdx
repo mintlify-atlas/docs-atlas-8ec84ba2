@@ -1,0 +1,282 @@
+---
+title: "Users API"
+description: "Manage user accounts and profiles"
+---
+
+## Overview
+
+The Users API provides endpoints for managing user accounts in the Wildlife Watcher system. Users can be researchers, field technicians, or administrators working with the wildlife monitoring platform.
+
+## Endpoints
+
+The `usersApi` exposes five RTK Query endpoints for full CRUD operations on user accounts.
+
+### Get All Users
+
+Retrieve all users from the system.
+
+<CodeGroup>
+```typescript Hook
+import { useGetUsersQuery } from "@/redux/api/users"
+
+function UsersList() {
+  const { data: users, isLoading } = useGetUsersQuery()
+
+  if (isLoading) return <WWLoader />
+
+  return (
+    <WWScrollView>
+      {users?.map((user) => (
+        <UserCard key={user._id} user={user} />
+      ))}
+    </WWScrollView>
+  )
+}
+```
+</CodeGroup>
+
+**Hook**: `useGetUsersQuery()`
+
+**Returns**: `User[]`
+
+### Get User by ID
+
+Retrieve a specific user by their unique identifier.
+
+<CodeGroup>
+```typescript Hook
+import { useGetUserByIdQuery } from "@/redux/api/users"
+
+function UserProfile({ userId }: { userId: string }) {
+  const { data: user, isLoading } = useGetUserByIdQuery(userId)
+
+  if (isLoading) return <WWLoader />
+  if (!user) return <WWText>User not found</WWText>
+
+  return (
+    <WWScreenView>
+      <WWAvatar size={80} />
+      <WWText variant="title">{user.name}</WWText>
+      <WWText>{user.email}</WWText>
+      <WWText>Role: {user.role}</WWText>
+    </WWScreenView>
+  )
+}
+```
+</CodeGroup>
+
+**Hook**: `useGetUserByIdQuery(id: string)`
+
+**Returns**: `User`
+
+### Create User
+
+Create a new user account in the system.
+
+<CodeGroup>
+```typescript Hook
+import { useCreateUserMutation } from "@/redux/api/users"
+
+function CreateUser() {
+  const [createUser, { isLoading }] = useCreateUserMutation()
+
+  const handleCreate = async () => {
+    try {
+      const newUser = await createUser({
+        userID: "USER-" + Date.now(),
+        name: "Jane Researcher",
+        email: "jane@wildlife.ai",
+        role: "researcher",
+        organization: "Wildlife Conservation Society"
+      }).unwrap()
+      
+      console.log("User created:", newUser)
+    } catch (error) {
+      console.error("Failed to create user:", error)
+    }
+  }
+
+  return (
+    <WWButton onPress={handleCreate} loading={isLoading}>
+      Create User
+    </WWButton>
+  )
+}
+```
+</CodeGroup>
+
+**Hook**: `useCreateUserMutation()`
+
+**Params**:
+
+<ParamField path="userID" type="string" required>
+  Unique identifier for the user
+</ParamField>
+
+<ParamField path="name" type="string" required>
+  Full name of the user
+</ParamField>
+
+<ParamField path="email" type="string" required>
+  Email address
+</ParamField>
+
+<ParamField path="role" type="string" required>
+  User role (e.g., "admin", "researcher", "field_technician")
+</ParamField>
+
+<ParamField path="organization" type="string">
+  Organization or institution the user belongs to
+</ParamField>
+
+<ParamField path="bio" type="string">
+  User biography or description
+</ParamField>
+
+<ParamField path="profilePicture" type="string">
+  URL to the user's profile picture
+</ParamField>
+
+**Returns**: `User`
+
+### Update User
+
+Update an existing user's information.
+
+<CodeGroup>
+```typescript Hook
+import { useUpdateUserMutation } from "@/redux/api/users"
+
+function UpdateUser({ userId }: { userId: string }) {
+  const [updateUser, { isLoading }] = useUpdateUserMutation()
+
+  const handleUpdate = async () => {
+    try {
+      await updateUser({
+        id: userId,
+        body: {
+          organization: "New Conservation Group",
+          bio: "Updated biography"
+        }
+      }).unwrap()
+      
+      Toast.show({
+        type: "success",
+        text1: "Profile updated successfully"
+      })
+    } catch (error) {
+      console.error("Failed to update user:", error)
+    }
+  }
+
+  return (
+    <WWButton onPress={handleUpdate} loading={isLoading}>
+      Update Profile
+    </WWButton>
+  )
+}
+```
+</CodeGroup>
+
+**Hook**: `useUpdateUserMutation()`
+
+**Params**: `{ id: string, body: UserUpdate }`
+
+**Returns**: `User`
+
+### Delete User
+
+Delete a user account from the system.
+
+<CodeGroup>
+```typescript Hook
+import { useDeleteUserMutation } from "@/redux/api/users"
+
+function DeleteUser({ userId }: { userId: string }) {
+  const [deleteUser, { isLoading }] = useDeleteUserMutation()
+
+  const handleDelete = async () => {
+    try {
+      await deleteUser(userId).unwrap()
+      console.log("User deleted")
+    } catch (error) {
+      console.error("Failed to delete user:", error)
+    }
+  }
+
+  return (
+    <WWButton 
+      onPress={handleDelete} 
+      loading={isLoading}
+      mode="contained"
+    >
+      Delete User
+    </WWButton>
+  )
+}
+```
+</CodeGroup>
+
+**Hook**: `useDeleteUserMutation()`
+
+**Params**: `id: string`
+
+**Returns**: `void`
+
+## Type Definitions
+
+### User
+
+<ResponseField name="_id" type="string">
+  Unique MongoDB identifier
+</ResponseField>
+
+<ResponseField name="userID" type="string">
+  User-specific identifier
+</ResponseField>
+
+<ResponseField name="name" type="string">
+  Full name of the user
+</ResponseField>
+
+<ResponseField name="email" type="string">
+  Email address
+</ResponseField>
+
+<ResponseField name="role" type="string">
+  User role in the system (admin, researcher, field_technician, etc.)
+</ResponseField>
+
+<ResponseField name="organization" type="string">
+  Organization or institution the user belongs to
+</ResponseField>
+
+<ResponseField name="bio" type="string">
+  User biography or description
+</ResponseField>
+
+<ResponseField name="profilePicture" type="string">
+  URL to the user's profile picture
+</ResponseField>
+
+<ResponseField name="createdAt" type="string">
+  ISO 8601 timestamp of when the user was created
+</ResponseField>
+
+<ResponseField name="updatedAt" type="string">
+  ISO 8601 timestamp of when the user was last updated
+</ResponseField>
+
+## Cache Management
+
+The users API automatically manages cache invalidation:
+
+- **Creating** a user invalidates the `LIST` tag, refreshing all user queries
+- **Updating** a user invalidates both the specific user and the `LIST` tag
+- **Deleting** a user invalidates both the specific user and the `LIST` tag
+
+## Related
+
+- [Authentication](/guides/authentication) - OAuth login and JWT authentication
+- [Projects API](/api/projects) - Project membership management
+- [API Overview](/api/overview) - RTK Query setup and patterns

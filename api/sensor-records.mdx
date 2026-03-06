@@ -1,0 +1,269 @@
+---
+title: "Sensor Records API"
+description: "Manage sensor data records from Wildlife Watcher devices"
+---
+
+## Overview
+
+The Sensor Records API provides endpoints for managing sensor data collected from Wildlife Watcher devices. Sensor records contain raw data from device sensors including temperature, battery voltage, and trap status.
+
+## Endpoints
+
+The `sensorRecordsApi` exposes five RTK Query endpoints for full CRUD operations on sensor records.
+
+### Get All Sensor Records
+
+Retrieve all sensor records from the backend.
+
+<CodeGroup>
+```typescript Hook
+import { useGetSensorRecordsQuery } from "@/redux/api/sensorRecords"
+
+function SensorRecordsList() {
+  const { data: sensorRecords, isLoading } = useGetSensorRecordsQuery()
+
+  if (isLoading) return <WWLoader />
+
+  return (
+    <WWScrollView>
+      {sensorRecords?.map((record) => (
+        <SensorRecordCard key={record._id} record={record} />
+      ))}
+    </WWScrollView>
+  )
+}
+```
+</CodeGroup>
+
+**Hook**: `useGetSensorRecordsQuery()`
+
+**Returns**: `SensorRecord[]`
+
+### Get Sensor Record by ID
+
+Retrieve a specific sensor record by its unique identifier.
+
+<CodeGroup>
+```typescript Hook
+import { useGetSensorRecordByIdQuery } from "@/redux/api/sensorRecords"
+
+function SensorRecordDetail({ recordId }: { recordId: string }) {
+  const { data: record, isLoading } = useGetSensorRecordByIdQuery(recordId)
+
+  if (isLoading) return <WWLoader />
+  if (!record) return <WWText>Record not found</WWText>
+
+  return (
+    <WWScreenView>
+      <WWText variant="title">Sensor ID: {record.sensorID}</WWText>
+      <WWText>Temperature: {record.temperature}°C</WWText>
+      <WWText>Battery: {record.batteryVoltage}V</WWText>
+    </WWScreenView>
+  )
+}
+```
+</CodeGroup>
+
+**Hook**: `useGetSensorRecordByIdQuery(id: string)`
+
+**Returns**: `SensorRecord`
+
+### Create Sensor Record
+
+Create a new sensor record in the system.
+
+<CodeGroup>
+```typescript Hook
+import { useCreateSensorRecordMutation } from "@/redux/api/sensorRecords"
+
+function CreateSensorRecord() {
+  const [createRecord, { isLoading }] = useCreateSensorRecordMutation()
+
+  const handleCreate = async () => {
+    try {
+      const newRecord = await createRecord({
+        deviceId: selectedDevice.id,
+        sensorID: "SENSOR-001",
+        temperature: 23.5,
+        batteryVoltage: 3.7,
+        trapStatus: "armed",
+        timestamp: new Date().toISOString()
+      }).unwrap()
+      
+      console.log("Sensor record created:", newRecord)
+    } catch (error) {
+      console.error("Failed to create sensor record:", error)
+    }
+  }
+
+  return (
+    <WWButton onPress={handleCreate} loading={isLoading}>
+      Create Sensor Record
+    </WWButton>
+  )
+}
+```
+</CodeGroup>
+
+**Hook**: `useCreateSensorRecordMutation()`
+
+**Params**:
+
+<ParamField path="deviceId" type="string" required>
+  ID of the device that captured this sensor data
+</ParamField>
+
+<ParamField path="sensorID" type="string" required>
+  Unique identifier for the sensor
+</ParamField>
+
+<ParamField path="temperature" type="number">
+  Temperature reading in degrees Celsius
+</ParamField>
+
+<ParamField path="batteryVoltage" type="number">
+  Battery voltage reading
+</ParamField>
+
+<ParamField path="trapStatus" type="string">
+  Current trap status (e.g., "armed", "triggered", "disabled")
+</ParamField>
+
+<ParamField path="timestamp" type="string" required>
+  ISO 8601 timestamp when the data was recorded
+</ParamField>
+
+**Returns**: `SensorRecord`
+
+### Update Sensor Record
+
+Update an existing sensor record.
+
+<CodeGroup>
+```typescript Hook
+import { useUpdateSensorRecordMutation } from "@/redux/api/sensorRecords"
+
+function UpdateSensorRecord({ recordId }: { recordId: string }) {
+  const [updateRecord, { isLoading }] = useUpdateSensorRecordMutation()
+
+  const handleUpdate = async () => {
+    try {
+      await updateRecord({
+        id: recordId,
+        body: {
+          trapStatus: "triggered",
+          timestamp: new Date().toISOString()
+        }
+      }).unwrap()
+    } catch (error) {
+      console.error("Failed to update sensor record:", error)
+    }
+  }
+
+  return (
+    <WWButton onPress={handleUpdate} loading={isLoading}>
+      Update Status
+    </WWButton>
+  )
+}
+```
+</CodeGroup>
+
+**Hook**: `useUpdateSensorRecordMutation()`
+
+**Params**: `{ id: string, body: SensorRecordUpdate }`
+
+**Returns**: `SensorRecord`
+
+### Delete Sensor Record
+
+Delete a sensor record from the system.
+
+<CodeGroup>
+```typescript Hook
+import { useDeleteSensorRecordMutation } from "@/redux/api/sensorRecords"
+
+function DeleteSensorRecord({ recordId }: { recordId: string }) {
+  const [deleteRecord, { isLoading }] = useDeleteSensorRecordMutation()
+
+  const handleDelete = async () => {
+    try {
+      await deleteRecord(recordId).unwrap()
+      console.log("Sensor record deleted")
+    } catch (error) {
+      console.error("Failed to delete sensor record:", error)
+    }
+  }
+
+  return (
+    <WWButton 
+      onPress={handleDelete} 
+      loading={isLoading}
+      mode="contained"
+    >
+      Delete Record
+    </WWButton>
+  )
+}
+```
+</CodeGroup>
+
+**Hook**: `useDeleteSensorRecordMutation()`
+
+**Params**: `id: string`
+
+**Returns**: `void`
+
+## Type Definitions
+
+### SensorRecord
+
+<ResponseField name="_id" type="string">
+  Unique identifier for the sensor record
+</ResponseField>
+
+<ResponseField name="sensorID" type="string">
+  Sensor-specific identifier
+</ResponseField>
+
+<ResponseField name="deviceId" type="string">
+  Reference to the device that captured this data
+</ResponseField>
+
+<ResponseField name="temperature" type="number">
+  Temperature reading in degrees Celsius
+</ResponseField>
+
+<ResponseField name="batteryVoltage" type="number">
+  Battery voltage reading
+</ResponseField>
+
+<ResponseField name="trapStatus" type="string">
+  Current status of the trap sensor
+</ResponseField>
+
+<ResponseField name="timestamp" type="string">
+  ISO 8601 timestamp of when the data was recorded
+</ResponseField>
+
+<ResponseField name="createdAt" type="string">
+  ISO 8601 timestamp of when the record was created
+</ResponseField>
+
+<ResponseField name="updatedAt" type="string">
+  ISO 8601 timestamp of when the record was last updated
+</ResponseField>
+
+## Cache Management
+
+The sensor records API automatically manages cache invalidation:
+
+- **Creating** a sensor record invalidates the `LIST` tag, refreshing all sensor record queries
+- **Updating** a sensor record invalidates both the specific record and the `LIST` tag
+- **Deleting** a sensor record invalidates both the specific record and the `LIST` tag
+
+## Related
+
+- [Devices API](/api/devices) - Manage Wildlife Watcher devices
+- [Observations API](/api/observations) - Wildlife observation records
+- [Deployments API](/api/deployments) - Device deployment tracking

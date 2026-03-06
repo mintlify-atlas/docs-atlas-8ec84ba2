@@ -101,7 +101,9 @@
               "api/projects",
               "api/deployments",
               "api/observations",
-              "api/media"
+              "api/media",
+              "api/sensor-records",
+              "api/users"
             ]
           },
           {
