@@ -1,97 +1,132 @@
 ---
-title: "Introduction"
-description: "Welcome to the new home for your documentation"
+title: "Wildlife Watcher Mobile App"
+description: "Monitor and manage wildlife cameras via Bluetooth with the Wildlife Watcher mobile app"
 ---
 
-## Setting up
+<div style={{backgroundColor: '#ffffff', padding: '3rem 2rem', borderRadius: '8px', marginBottom: '2rem', boxShadow: '0 8px 24px rgba(0,0,0,0.2)'}}>
+  <h1 style={{fontSize: '2.5rem', fontWeight: '700', color: '#202124', fontFamily: 'Roboto, Arial, sans-serif', marginBottom: '1rem'}}>
+    Wildlife Watcher Mobile App
+  </h1>
+  <p style={{fontSize: '1.25rem', color: '#202124', fontFamily: 'Roboto, Arial, sans-serif', marginBottom: '2rem'}}>
+    Connect with Wildlife Watcher cameras via Bluetooth to manage wildlife monitoring devices, track deployments, and analyze observations in the field.
+  </p>
+  <div style={{display: 'flex', gap: '1rem', flexWrap: 'wrap'}}>
+    <a href="/installation" style={{backgroundColor: '#181818', color: '#ffffff', padding: '0.75rem 1.5rem', borderRadius: '16px', textDecoration: 'none', fontFamily: 'Roboto, Arial, sans-serif', fontWeight: '400', fontSize: '14px'}}>
+      Get Started
+    </a>
+    <a href="https://github.com/wildlifeai/wildlife-watcher-mobile-app" style={{backgroundColor: '#f2f2f2', color: '#000000', padding: '0.75rem 1.5rem', borderRadius: '16px', textDecoration: 'none', fontFamily: 'Roboto, Arial, sans-serif', fontWeight: '400', fontSize: '14px'}}>
+      View on GitHub
+    </a>
+  </div>
+</div>
 
-Get your documentation site up and running in minutes.
+## Key Features
 
-<Card
-  title="Start here"
-  icon="rocket"
-  href="/quickstart"
-  horizontal
->
-  Follow our three step quickstart guide.
+The Wildlife Watcher mobile app enables field researchers and conservationists to communicate directly with wildlife monitoring cameras using Bluetooth Low Energy technology.
+
+<CardGroup cols={2}>
+  <Card title="Bluetooth Device Management" icon="bluetooth" href="/features/ble-communication">
+    Scan, connect, and communicate with Wildlife Watcher cameras via BLE
+  </Card>
+  <Card title="Camera Configuration" icon="camera" href="/features/device-management">
+    Configure device settings, manage LoRaWAN credentials, and update firmware
+  </Card>
+  <Card title="Project Tracking" icon="folder-tree" href="/features/projects-deployments">
+    Organize deployments by project and track camera locations on interactive maps
+  </Card>
+  <Card title="Real-time Data" icon="chart-line" href="/features/maps-observations">
+    View sensor records and wildlife observations synchronized from the backend
+  </Card>
+</CardGroup>
+
+## Quick Start
+
+Get the app running on your device in minutes.
+
+<Steps>
+  <Step title="Install Dependencies">
+    Clone the repository and install Node.js dependencies
+    ```bash
+    git clone https://github.com/wildlifeai/wildlife-watcher-mobile-app.git
+    cd wildlife-watcher-mobile-app
+    npm install
+    ```
+  </Step>
+  <Step title="Set Up Platform">
+    For iOS, install CocoaPods dependencies:
+    ```bash
+    bundle install
+    bundle exec pod install --project-directory=ios
+    ```
+    
+    For Android, ensure you have Android Studio and SDK set up per the [React Native documentation](https://reactnative.dev/docs/set-up-your-environment).
+  </Step>
+  <Step title="Run the App">
+    Start Metro bundler and launch the app:
+    ```bash
+    npm start
+    npm run ios    # For iOS
+    npm run android # For Android
+    ```
+  </Step>
+</Steps>
+
+## Technical Stack
+
+Built with modern React Native technologies for cross-platform mobile development.
+
+<CardGroup cols={2}>
+  <Card title="React Native 0.74" icon="mobile">
+    Cross-platform mobile framework for iOS and Android
+  </Card>
+  <Card title="Redux Toolkit" icon="layer-group">
+    State management with RTK Query for API integration
+  </Card>
+  <Card title="React Navigation 6" icon="compass">
+    Native navigation with stack and drawer patterns
+  </Card>
+  <Card title="React Native Paper" icon="palette">
+    Material Design UI component library
+  </Card>
+</CardGroup>
+
+## Explore the Documentation
+
+<CardGroup cols={3}>
+  <Card title="Installation Guide" icon="download" href="/installation">
+    Set up your development environment
+  </Card>
+  <Card title="BLE Communication" icon="signal" href="/features/ble-communication">
+    Learn how Bluetooth communication works
+  </Card>
+  <Card title="API Reference" icon="code" href="/api/overview">
+    Explore the Redux API and hooks
+  </Card>
+  <Card title="UI Components" icon="palette" href="/components/overview">
+    Browse the component library
+  </Card>
+  <Card title="Configuration" icon="gear" href="/guides/configuration">
+    Configure app settings and environment
+  </Card>
+  <Card title="Troubleshooting" icon="wrench" href="/guides/troubleshooting">
+    Common issues and solutions
+  </Card>
+</CardGroup>
+
+## Project Overview
+
+Watch the [Wildlife Watcher project overview on YouTube](https://www.youtube.com/watch?v=Ima3n2EYfeE) to learn more about the wildlife monitoring system.
+
+<Note>
+  This mobile app is part of the Wildlife Watcher ecosystem, which includes AI-powered wildlife cameras that detect and identify animals in the field. The app enables field researchers to configure cameras, download data, and manage deployments without requiring internet connectivity.
+</Note>
+
+## Contributing
+
+The Wildlife Watcher project is open source and welcomes contributions from the community.
+
+<Card title="Contribute on GitHub" icon="github" href="https://github.com/wildlifeai/wildlife-watcher-mobile-app/pulls">
+  Submit pull requests to help improve the app
 </Card>
 
-## Make it yours
-
-Design a docs site that looks great and empowers your users.
-
-<Columns cols={2}>
-  <Card
-    title="Edit locally"
-    icon="pen-to-square"
-    href="/development"
-  >
-    Edit your docs locally and preview them in real time.
-  </Card>
-  <Card
-    title="Customize your site"
-    icon="palette"
-    href="/essentials/settings"
-  >
-    Customize the design and colors of your site to match your brand.
-  </Card>
-    <Card
-    title="Set up navigation"
-    icon="map"
-    href="/essentials/navigation"
-  >
-    Organize your docs to help users find what they need and succeed with your product.
-  </Card>
-  <Card
-    title="API documentation"
-    icon="terminal"
-    href="/api-reference/introduction"
-  >
-    Auto-generate API documentation from OpenAPI specifications.
-  </Card>
-</Columns>
-
-## Create beautiful pages
-
-Everything you need to create world-class documentation.
-
-<Columns cols={2}>
-  <Card
-    title="Write with MDX"
-    icon="pen-fancy"
-    href="/essentials/markdown"
-  >
-    Use MDX to style your docs pages.
-  </Card>
-  <Card
-    title="Code samples"
-    icon="code"
-    href="/essentials/code"
-  >
-    Add sample code to demonstrate how to use your product.
-  </Card>
-  <Card
-    title="Images"
-    icon="image"
-    href="/essentials/images"
-  >
-    Display images and other media.
-  </Card>
-  <Card
-    title="Reusable snippets"
-    icon="recycle"
-    href="/essentials/reusable-snippets"
-  >
-    Write once and reuse across your docs.
-  </Card>
-</Columns>
-
-## Need inspiration?
-
-<Card
-  title="See complete examples"
-  icon="stars"
-  href="https://mintlify.com/customers"
->
-  Browse our showcase of exceptional documentation sites.
-</Card>
+If you find this project helpful, consider [donating to Wildlife.ai](https://givealittle.co.nz/donate/org/wildlifeai) to support wildlife conservation technology.

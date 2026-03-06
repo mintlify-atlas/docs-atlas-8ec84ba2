@@ -1,0 +1,401 @@
+---
+title: "BLE Providers"
+description: "React Context providers for managing BLE state and functionality across the Wildlife Watcher app"
+---
+
+# BLE Providers
+
+The Wildlife Watcher app uses React Context providers to make BLE functionality available throughout the component tree.
+
+## BleEngineProvider
+
+Provides access to core BLE operations via the `useBle` hook. This is the main provider for BLE functionality.
+
+### Import
+
+```typescript
+import { BleEngineProvider, useBleActions } from '../providers/BleEngineProvider'
+```
+
+### Setup
+
+Wrap your app with the provider:
+
+```typescript
+import { BleEngineProvider } from '../providers/BleEngineProvider'
+
+const App = () => {
+  return (
+    <BleEngineProvider>
+      <YourApp />
+    </BleEngineProvider>
+  )
+}
+```
+
+### Accessing BLE Actions
+
+Use the `useBleActions` hook to access BLE functionality:
+
+```typescript
+import { useBleActions } from '../providers/BleEngineProvider'
+
+const ScanButton = () => {
+  const { startScan, isBleConnecting } = useBleActions()
+  
+  return (
+    <Button 
+      onPress={() => startScan(10)}
+      disabled={isBleConnecting}
+    >
+      Scan for Devices
+    </Button>
+  )
+}
+```
+
+### Available Actions
+
+All values from the `useBle` hook are available through the context:
+
+<ResponseField name="isBleConnecting" type="boolean | undefined">
+  Indicates whether a BLE connection is currently in progress
+</ResponseField>
+
+<ResponseField name="startScan" type="(length?: number) => void">
+  Starts scanning for nearby devices
+</ResponseField>
+
+<ResponseField name="connectDevice" type="(peripheral: ExtendedPeripheral, timeout?: number) => Promise<ExtendedPeripheral>">
+  Connects to a BLE device
+</ResponseField>
+
+<ResponseField name="disconnectDevice" type="(peripheral: ExtendedPeripheral) => void">
+  Disconnects from a BLE device
+</ResponseField>
+
+<ResponseField name="write" type="(peripheral: ExtendedPeripheral, data: (string | WriteData)[]) => Promise<void>">
+  Writes commands to a BLE device
+</ResponseField>
+
+<ResponseField name="enginePause" type="(toggle: boolean) => void">
+  Pauses or resumes the BLE write engine
+</ResponseField>
+
+<ResponseField name="enginePaused" type="React.MutableRefObject<boolean>">
+  Ref indicating whether the engine is currently paused
+</ResponseField>
+
+<ResponseField name="pingsPause" type="(toggle: boolean) => void">
+  Pauses or resumes automatic ping operations
+</ResponseField>
+
+<ResponseField name="pingsPaused" type="React.MutableRefObject<boolean>">
+  Ref indicating whether pings are currently paused
+</ResponseField>
+
+### Example Usage
+
+<CodeGroup>
+```typescript Device Scanner
+import { useBleActions } from '../providers/BleEngineProvider'
+import { useAppSelector } from '../redux'
+
+const DeviceScanner = () => {
+  const { startScan, isBleConnecting } = useBleActions()
+  const scanning = useAppSelector((state) => state.scanning)
+  const devices = useAppSelector((state) => state.devices)
+  
+  return (
+    <View>
+      <Button
+        onPress={() => startScan(10)}
+        disabled={scanning.isScanning || isBleConnecting}
+      >
+        {scanning.isScanning ? 'Scanning...' : 'Start Scan'}
+      </Button>
+      
+      {Object.values(devices).map((device) => (
+        <DeviceCard key={device.id} device={device} />
+      ))}
+    </View>
+  )
+}
+```
+
+```typescript Device Connection
+import { useBleActions } from '../providers/BleEngineProvider'
+
+const DeviceCard = ({ device }: { device: ExtendedPeripheral }) => {
+  const { connectDevice, disconnectDevice } = useBleActions()
+  
+  const handleConnect = async () => {
+    if (device.connected) {
+      disconnectDevice(device)
+    } else {
+      await connectDevice(device, 15000)
+    }
+  }
+  
+  return (
+    <TouchableOpacity onPress={handleConnect}>
+      <Text>{device.name}</Text>
+      <Text>{device.connected ? 'Connected' : 'Disconnected'}</Text>
+    </TouchableOpacity>
+  )
+}
+```
+
+```typescript Writing Commands
+import { useBleActions } from '../providers/BleEngineProvider'
+import { CommandNames, CommandControlTypes } from '../ble/types'
+
+const DeviceController = ({ device }: { device: ExtendedPeripheral }) => {
+  const { write } = useBleActions()
+  
+  const resetDevice = async () => {
+    await write(device, [
+      [CommandNames.RESET, { control: CommandControlTypes.WRITE }]
+    ])
+  }
+  
+  const checkBattery = async () => {
+    await write(device, [
+      [CommandNames.BATTERY, { control: CommandControlTypes.READ }]
+    ])
+  }
+  
+  return (
+    <View>
+      <Button onPress={checkBattery}>Check Battery</Button>
+      <Button onPress={resetDevice}>Reset Device</Button>
+    </View>
+  )
+}
+```
+
+```typescript Engine Control
+import { useBleActions } from '../providers/BleEngineProvider'
+
+const SettingsScreen = () => {
+  const { enginePause, pingsPause, enginePaused, pingsPaused } = useBleActions()
+  
+  return (
+    <View>
+      <Switch
+        value={!enginePaused.current}
+        onValueChange={(value) => enginePause(!value)}
+      />
+      <Text>BLE Engine: {enginePaused.current ? 'Paused' : 'Active'}</Text>
+      
+      <Switch
+        value={!pingsPaused.current}
+        onValueChange={(value) => pingsPause(!value)}
+      />
+      <Text>Auto-Ping: {pingsPaused.current ? 'Disabled' : 'Enabled'}</Text>
+    </View>
+  )
+}
+```
+</CodeGroup>
+
+---
+
+## ListenToBleEngineProvider
+
+Attaches BLE event listeners and manages automatic state updates. This provider uses the `useBleListeners` hook internally.
+
+### Import
+
+```typescript
+import { ListenToBleEngineProvider } from '../providers/ListenToBleEngineProvider'
+```
+
+### Setup
+
+Wrap your app with this provider (typically inside `BleEngineProvider`):
+
+```typescript
+import { BleEngineProvider } from '../providers/BleEngineProvider'
+import { ListenToBleEngineProvider } from '../providers/ListenToBleEngineProvider'
+import { Provider } from 'react-redux'
+import { store } from '../redux/store'
+
+const App = () => {
+  return (
+    <Provider store={store}>
+      <BleEngineProvider>
+        <ListenToBleEngineProvider>
+          <YourApp />
+        </ListenToBleEngineProvider>
+      </BleEngineProvider>
+    </Provider>
+  )
+}
+```
+
+### What it Does
+
+This provider automatically:
+
+1. **Listens for device discoveries** during scanning
+2. **Handles scan stop events** and updates device signal status
+3. **Processes device disconnections** and cleans up state
+4. **Parses BLE characteristic updates** and extracts command responses
+5. **Updates Redux state** with device logs and configuration
+6. **Manages log buffers** with automatic trimming (15,000 character limit)
+
+<Note>
+  This provider doesn't expose any hooks or values - it purely manages side effects and state synchronization.
+</Note>
+
+### Events Handled
+
+<ResponseField name="BleManagerDiscoverPeripheral">
+  Triggered when a device is discovered during scanning. Filters devices by name and updates Redux.
+</ResponseField>
+
+<ResponseField name="BleManagerStopScan">
+  Triggered when scanning stops. Marks devices as "signal lost" if not found and disconnects them.
+</ResponseField>
+
+<ResponseField name="BleManagerDisconnectPeripheral">
+  Triggered when a device disconnects. Removes the device from cache (Android) and updates state.
+</ResponseField>
+
+<ResponseField name="BleManagerDidUpdateValueForCharacteristic">
+  Triggered when characteristic values update. Parses logs using readline parser and extracts command responses.
+</ResponseField>
+
+### Log Parsing Flow
+
+```typescript
+// 1. Raw BLE data arrives
+BleManagerDidUpdateValueForCharacteristic
+  ↓
+// 2. Readline parser processes newlines
+readlineParser()
+  ↓
+// 3. Custom event emitted
+BleManagerDidUpdateValueForCharacteristicReadlineParser
+  ↓
+// 4. Log accumulation and parsing
+deviceValueUpdatedEvent()
+  ↓
+// 5. Command extraction
+parseLogs(finishedLog, text)
+  ↓
+// 6. Redux state update
+deviceConfigChanged()
+```
+
+### Example Provider Composition
+
+<CodeGroup>
+```typescript Full Provider Setup
+import React from 'react'
+import { Provider } from 'react-redux'
+import { BleEngineProvider } from '../providers/BleEngineProvider'
+import { ListenToBleEngineProvider } from '../providers/ListenToBleEngineProvider'
+import { store } from '../redux/store'
+import { NavigationContainer } from '@react-navigation/native'
+
+const App = () => {
+  return (
+    <Provider store={store}>
+      <BleEngineProvider>
+        <ListenToBleEngineProvider>
+          <NavigationContainer>
+            <AppNavigator />
+          </NavigationContainer>
+        </ListenToBleEngineProvider>
+      </BleEngineProvider>
+    </Provider>
+  )
+}
+
+export default App
+```
+
+```typescript Accessing State
+import { useAppSelector } from '../redux'
+
+const DeviceMonitor = ({ deviceId }: { deviceId: string }) => {
+  // State is automatically updated by ListenToBleEngineProvider
+  const device = useAppSelector((state) => state.devices[deviceId])
+  const config = useAppSelector((state) => state.configuration[deviceId])
+  const logs = useAppSelector((state) => state.logs[deviceId])
+  
+  return (
+    <View>
+      <Text>Name: {device?.name}</Text>
+      <Text>Connected: {device?.connected ? 'Yes' : 'No'}</Text>
+      <Text>Battery: {config?.BATTERY?.value}%</Text>
+      <Text>Sensor: {config?.SENSOR?.value}</Text>
+      
+      <ScrollView>
+        <Text style={{ fontFamily: 'monospace' }}>
+          {logs?.log}
+        </Text>
+      </ScrollView>
+    </View>
+  )
+}
+```
+</CodeGroup>
+
+---
+
+## Provider Architecture
+
+The recommended provider structure for a Wildlife Watcher app:
+
+```typescript
+<ReduxProvider>
+  <BleEngineProvider>           {/* Provides BLE actions */}
+    <ListenToBleEngineProvider> {/* Handles BLE events */}
+      <NavigationContainer>
+        <App />
+      </NavigationContainer>
+    </ListenToBleEngineProvider>
+  </BleEngineProvider>
+</ReduxProvider>
+```
+
+### Why This Order?
+
+1. **Redux Provider** must be outermost so state is available to all components
+2. **BleEngineProvider** provides BLE actions using `useBle` hook
+3. **ListenToBleEngineProvider** uses `useBleActions` from parent and Redux to sync state
+4. **NavigationContainer** provides navigation context for device disconnection handling
+
+### State Flow
+
+```
+BLE Device Event
+  ↓
+useBleListeners (in ListenToBleEngineProvider)
+  ↓
+Redux Dispatch
+  ↓
+Component Re-renders (via useAppSelector)
+```
+
+## Best Practices
+
+<Note>
+  **Provider Placement**: Always place `ListenToBleEngineProvider` inside `BleEngineProvider` since it depends on `useBleActions`.
+</Note>
+
+<Note>
+  **Single Instance**: Only render these providers once at the root of your app. Multiple instances will cause event listener duplication.
+</Note>
+
+<Note>
+  **Cleanup**: Both providers handle cleanup automatically when unmounted, removing all event listeners.
+</Note>
+
+## Related
+
+- [BLE Hooks](/components/ble/hooks) - React hooks for BLE operations
+- [BLE Commands](/components/ble/commands) - Complete command reference

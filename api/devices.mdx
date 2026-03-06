@@ -1,0 +1,428 @@
+---
+title: Devices API
+description: Manage camera trap devices
+---
+
+## Overview
+
+The Devices API provides endpoints for managing camera trap devices used in wildlife monitoring. All device endpoints are defined in `src/redux/api/devices/index.ts`.
+
+## Available Hooks
+
+```typescript
+import {
+  useGetDevicesQuery,
+  useGetDeviceByIdQuery,
+  useCreateDeviceMutation,
+  useUpdateDeviceMutation,
+  useDeleteDeviceMutation,
+} from '@/redux/api/devices'
+```
+
+## Device Type
+
+```typescript
+type Device = {
+  id: string
+  deviceId: string
+  deviceType?: string
+  deviceModel?: string
+  deploymentID?: string
+}
+
+type DeviceCreate = Omit<Device, "id" | "deviceId">
+type DeviceUpdate = Partial<DeviceCreate>
+```
+
+## Get All Devices
+
+Fetch a list of all devices.
+
+### Hook
+
+```typescript
+useGetDevicesQuery()
+```
+
+### Parameters
+
+None
+
+### Response
+
+Returns an array of `Device` objects.
+
+<ResponseField name="Device[]" type="array">
+  Array of device objects
+  
+  <ResponseField name="id" type="string">
+    Unique device identifier (internal)
+  </ResponseField>
+  
+  <ResponseField name="deviceId" type="string">
+    Device ID (auto-generated)
+  </ResponseField>
+  
+  <ResponseField name="deviceType" type="string" optional>
+    Type of device (e.g., "camera trap")
+  </ResponseField>
+  
+  <ResponseField name="deviceModel" type="string" optional>
+    Device model name
+  </ResponseField>
+  
+  <ResponseField name="deploymentID" type="string" optional>
+    ID of the deployment this device is associated with
+  </ResponseField>
+</ResponseField>
+
+### Usage Example
+
+<CodeGroup>
+
+```typescript Component
+import { useGetDevicesQuery } from '@/redux/api/devices'
+
+function DeviceList() {
+  const { data: devices, isLoading, error } = useGetDevicesQuery()
+
+  if (isLoading) return <Loading />
+  if (error) return <Error message="Failed to load devices" />
+
+  return (
+    <div>
+      <h2>Devices ({devices?.length})</h2>
+      {devices?.map(device => (
+        <DeviceCard key={device.id} device={device} />
+      ))}
+    </div>
+  )
+}
+```
+
+```typescript Response
+[
+  {
+    "id": "dev_123",
+    "deviceId": "CAM-001",
+    "deviceType": "camera trap",
+    "deviceModel": "Bushnell Trophy Cam",
+    "deploymentID": "dep_456"
+  },
+  {
+    "id": "dev_124",
+    "deviceId": "CAM-002",
+    "deviceType": "camera trap",
+    "deviceModel": "Reconyx HyperFire 2"
+  }
+]
+```
+
+</CodeGroup>
+
+## Get Device by ID
+
+Fetch a single device by its ID.
+
+### Hook
+
+```typescript
+useGetDeviceByIdQuery(id: string)
+```
+
+### Parameters
+
+<ParamField path="id" type="string" required>
+  The unique device ID
+</ParamField>
+
+### Response
+
+Returns a single `Device` object.
+
+### Usage Example
+
+<CodeGroup>
+
+```typescript Component
+import { useGetDeviceByIdQuery } from '@/redux/api/devices'
+
+function DeviceDetail({ deviceId }: { deviceId: string }) {
+  const { data: device, isLoading, error } = useGetDeviceByIdQuery(deviceId)
+
+  if (isLoading) return <Loading />
+  if (error) return <Error message="Device not found" />
+
+  return (
+    <div>
+      <h2>{device.deviceId}</h2>
+      <p>Type: {device.deviceType}</p>
+      <p>Model: {device.deviceModel}</p>
+      {device.deploymentID && (
+        <p>Deployment: {device.deploymentID}</p>
+      )}
+    </div>
+  )
+}
+```
+
+```typescript Response
+{
+  "id": "dev_123",
+  "deviceId": "CAM-001",
+  "deviceType": "camera trap",
+  "deviceModel": "Bushnell Trophy Cam",
+  "deploymentID": "dep_456"
+}
+```
+
+</CodeGroup>
+
+### Conditional Fetching
+
+```typescript
+// Skip the query if deviceId is not available
+const { data } = useGetDeviceByIdQuery(deviceId, {
+  skip: !deviceId,
+})
+```
+
+## Create Device
+
+Create a new device.
+
+### Hook
+
+```typescript
+useCreateDeviceMutation()
+```
+
+### Request Parameters
+
+<ParamField path="deviceType" type="string" optional>
+  Type of device
+</ParamField>
+
+<ParamField path="deviceModel" type="string" optional>
+  Device model name
+</ParamField>
+
+<ParamField path="deploymentID" type="string" optional>
+  Associated deployment ID
+</ParamField>
+
+### Response
+
+Returns the created `Device` object with auto-generated `id` and `deviceId`.
+
+### Usage Example
+
+<CodeGroup>
+
+```typescript Component
+import { useCreateDeviceMutation } from '@/redux/api/devices'
+import { useState } from 'react'
+
+function CreateDeviceForm() {
+  const [createDevice, { isLoading }] = useCreateDeviceMutation()
+  const [formData, setFormData] = useState({
+    deviceType: '',
+    deviceModel: '',
+  })
+
+  const handleSubmit = async (e) => {
+    e.preventDefault()
+    
+    try {
+      const device = await createDevice(formData).unwrap()
+      console.log('Device created:', device.deviceId)
+      // Navigate or show success message
+    } catch (error) {
+      console.error('Failed to create device:', error)
+    }
+  }
+
+  return (
+    <form onSubmit={handleSubmit}>
+      <input
+        type="text"
+        value={formData.deviceType}
+        onChange={(e) => setFormData({ ...formData, deviceType: e.target.value })}
+        placeholder="Device Type"
+      />
+      <input
+        type="text"
+        value={formData.deviceModel}
+        onChange={(e) => setFormData({ ...formData, deviceModel: e.target.value })}
+        placeholder="Device Model"
+      />
+      <button type="submit" disabled={isLoading}>
+        {isLoading ? 'Creating...' : 'Create Device'}
+      </button>
+    </form>
+  )
+}
+```
+
+```typescript Request
+{
+  "deviceType": "camera trap",
+  "deviceModel": "Bushnell Trophy Cam"
+}
+```
+
+```typescript Response
+{
+  "id": "dev_125",
+  "deviceId": "CAM-003",
+  "deviceType": "camera trap",
+  "deviceModel": "Bushnell Trophy Cam"
+}
+```
+
+</CodeGroup>
+
+## Update Device
+
+Update an existing device.
+
+### Hook
+
+```typescript
+useUpdateDeviceMutation()
+```
+
+### Request Parameters
+
+<ParamField path="id" type="string" required>
+  Device ID to update
+</ParamField>
+
+<ParamField path="body" type="DeviceUpdate" required>
+  Partial device object with fields to update
+</ParamField>
+
+### Response
+
+Returns the updated `Device` object.
+
+### Usage Example
+
+<CodeGroup>
+
+```typescript Component
+import { useUpdateDeviceMutation } from '@/redux/api/devices'
+
+function EditDeviceForm({ device }: { device: Device }) {
+  const [updateDevice, { isLoading }] = useUpdateDeviceMutation()
+  const [deviceModel, setDeviceModel] = useState(device.deviceModel || '')
+
+  const handleUpdate = async () => {
+    try {
+      const updated = await updateDevice({
+        id: device.id,
+        body: { deviceModel },
+      }).unwrap()
+      
+      console.log('Device updated:', updated)
+    } catch (error) {
+      console.error('Failed to update device:', error)
+    }
+  }
+
+  return (
+    <div>
+      <input
+        value={deviceModel}
+        onChange={(e) => setDeviceModel(e.target.value)}
+        placeholder="Device Model"
+      />
+      <button onClick={handleUpdate} disabled={isLoading}>
+        {isLoading ? 'Updating...' : 'Update'}
+      </button>
+    </div>
+  )
+}
+```
+
+```typescript Request
+{
+  "id": "dev_123",
+  "body": {
+    "deviceModel": "Bushnell Trophy Cam HD"
+  }
+}
+```
+
+```typescript Response
+{
+  "id": "dev_123",
+  "deviceId": "CAM-001",
+  "deviceType": "camera trap",
+  "deviceModel": "Bushnell Trophy Cam HD",
+  "deploymentID": "dep_456"
+}
+```
+
+</CodeGroup>
+
+## Delete Device
+
+Delete a device by ID.
+
+### Hook
+
+```typescript
+useDeleteDeviceMutation()
+```
+
+### Parameters
+
+<ParamField path="id" type="string" required>
+  Device ID to delete
+</ParamField>
+
+### Response
+
+Returns `void` on success.
+
+### Usage Example
+
+<CodeGroup>
+
+```typescript Component
+import { useDeleteDeviceMutation } from '@/redux/api/devices'
+
+function DeleteDeviceButton({ deviceId }: { deviceId: string }) {
+  const [deleteDevice, { isLoading }] = useDeleteDeviceMutation()
+
+  const handleDelete = async () => {
+    if (!confirm('Are you sure you want to delete this device?')) return
+    
+    try {
+      await deleteDevice(deviceId).unwrap()
+      console.log('Device deleted successfully')
+    } catch (error) {
+      console.error('Failed to delete device:', error)
+    }
+  }
+
+  return (
+    <button onClick={handleDelete} disabled={isLoading}>
+      {isLoading ? 'Deleting...' : 'Delete Device'}
+    </button>
+  )
+}
+```
+
+</CodeGroup>
+
+## Cache Invalidation
+
+The Devices API automatically manages cache invalidation:
+
+- Creating a device invalidates the device list
+- Updating a device invalidates both the specific device and the list
+- Deleting a device invalidates both the specific device and the list
+
+This ensures your UI always displays the latest data without manual refetching.

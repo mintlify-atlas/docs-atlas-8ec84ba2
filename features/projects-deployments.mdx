@@ -1,0 +1,612 @@
+---
+title: Projects & Deployments
+description: Managing wildlife monitoring projects and field deployments in the Wildlife Watcher app
+---
+
+## Overview
+
+The Wildlife Watcher app organizes field work into **Projects** and **Deployments**. Projects represent high-level monitoring initiatives, while Deployments track specific device installations in the field.
+
+## Data Structure
+
+### Projects
+
+```typescript
+type Project = {
+  id: string
+  name: string
+  description?: string
+  startDate?: string
+  endDate?: string
+  createdAt: string
+  updatedAt: string
+}
+```
+
+### Deployments
+
+```typescript
+type Deployment = {
+  id: string
+  projectId: string
+  locationName?: string
+  latitude?: number
+  longitude?: number
+  deploymentComments?: string
+  deviceId?: string
+  startDate: string
+  endDate?: string
+  createdAt: string
+  updatedAt: string
+}
+```
+
+## Projects API
+
+The app uses RTK Query for data fetching and caching:
+
+### Fetching Projects
+
+```typescript src/screens/ProjectList.tsx
+import { useGetProjectsQuery } from '../../redux/api/projects';
+import { WWLoader } from '../../components/ui/WWLoader';
+
+const ProjectList = () => {
+  const { data: projects, isLoading, error } = useGetProjectsQuery();
+
+  if (isLoading) return <WWLoader />;
+  
+  if (error) {
+    return <WWText>Failed to load projects</WWText>;
+  }
+
+  return (
+    <FlatList
+      data={projects}
+      renderItem={({ item }) => (
+        <ProjectCard project={item} />
+      )}
+      keyExtractor={(item) => item.id}
+    />
+  );
+};
+```
+
+### Fetching Single Project
+
+```typescript
+import { useGetProjectByIdQuery } from '../../redux/api/projects';
+
+const ProjectDetails = ({ projectId }: { projectId: string }) => {
+  const { data: project, isLoading } = useGetProjectByIdQuery(projectId);
+
+  if (isLoading) return <WWLoader />;
+  if (!project) return <WWText>Project not found</WWText>;
+
+  return (
+    <View>
+      <WWText variant="titleLarge">{project.name}</WWText>
+      <WWText>{project.description}</WWText>
+      <WWText>Start: {project.startDate}</WWText>
+      <WWText>End: {project.endDate}</WWText>
+    </View>
+  );
+};
+```
+
+### Creating a Project
+
+```typescript src/screens/AddProject.tsx
+import { useState } from 'react';
+import { useCreateProjectMutation } from '../../redux/api/projects';
+import { WWTextInput } from '../../components/ui/WWTextInput';
+import { WWButton } from '../../components/ui/WWButton';
+
+const AddProject = () => {
+  const [name, setName] = useState('');
+  const [description, setDescription] = useState('');
+  const [createProject, { isLoading }] = useCreateProjectMutation();
+  const navigation = useAppNavigation();
+
+  const handleSubmit = async () => {
+    try {
+      const newProject = await createProject({
+        data: {
+          name,
+          description,
+          startDate: new Date().toISOString()
+        }
+      }).unwrap();
+
+      console.log('Project created:', newProject);
+      navigation.goBack();
+    } catch (error) {
+      console.error('Failed to create project:', error);
+      Alert.alert('Error', 'Failed to create project');
+    }
+  };
+
+  return (
+    <WWScreenView>
+      <WWTextInput
+        label="Project Name"
+        value={name}
+        onChangeText={setName}
+      />
+      <WWTextInput
+        label="Description"
+        value={description}
+        onChangeText={setDescription}
+        multiline
+        numberOfLines={4}
+      />
+      <WWButton
+        mode="contained"
+        onPress={handleSubmit}
+        loading={isLoading}
+        disabled={!name || isLoading}
+      >
+        Create Project
+      </WWButton>
+    </WWScreenView>
+  );
+};
+```
+
+<Note>
+The Strapi backend expects data wrapped in a `data` object: `{ data: { name, description } }`
+</Note>
+
+### Updating a Project
+
+```typescript
+import { useUpdateProjectMutation } from '../../redux/api/projects';
+
+const EditProject = ({ projectId }: { projectId: string }) => {
+  const { data: project } = useGetProjectByIdQuery(projectId);
+  const [updateProject, { isLoading }] = useUpdateProjectMutation();
+  const [name, setName] = useState(project?.name || '');
+
+  const handleUpdate = async () => {
+    try {
+      await updateProject({
+        id: projectId,
+        body: {
+          data: { name }
+        }
+      }).unwrap();
+
+      Alert.alert('Success', 'Project updated');
+    } catch (error) {
+      Alert.alert('Error', 'Failed to update project');
+    }
+  };
+
+  return (
+    <View>
+      <WWTextInput
+        label="Project Name"
+        value={name}
+        onChangeText={setName}
+      />
+      <WWButton onPress={handleUpdate} loading={isLoading}>
+        Update Project
+      </WWButton>
+    </View>
+  );
+};
+```
+
+### Deleting a Project
+
+```typescript
+import { useDeleteProjectMutation } from '../../redux/api/projects';
+
+const ProjectActions = ({ projectId }: { projectId: string }) => {
+  const [deleteProject, { isLoading }] = useDeleteProjectMutation();
+
+  const handleDelete = async () => {
+    Alert.alert(
+      'Delete Project',
+      'Are you sure you want to delete this project?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await deleteProject(projectId).unwrap();
+              navigation.goBack();
+            } catch (error) {
+              Alert.alert('Error', 'Failed to delete project');
+            }
+          }
+        }
+      ]
+    );
+  };
+
+  return (
+    <WWButton 
+      mode="outlined" 
+      onPress={handleDelete}
+      loading={isLoading}
+    >
+      Delete Project
+    </WWButton>
+  );
+};
+```
+
+## Deployments API
+
+Deployments work similarly to projects with the same CRUD operations:
+
+### Fetching Deployments
+
+```typescript src/navigation/screens/Deployments.tsx
+import { useGetDeploymentsQuery } from '../../redux/api/deployments';
+import { DeploymentCard } from '../../components/DeploymentCard';
+
+const Deployments = () => {
+  const { data: deployments, isLoading } = useGetDeploymentsQuery();
+  const navigation = useAppNavigation();
+
+  const handleDeploymentPress = (deploymentId: string) => {
+    navigation.navigate('DeploymentDetails', { deploymentId });
+  };
+
+  return (
+    <WWScreenView scrollable>
+      <WWText variant="titleLarge">Deployments</WWText>
+      
+      {isLoading ? (
+        <WWLoader />
+      ) : deployments && deployments.length > 0 ? (
+        <View>
+          {deployments.map((deployment) => (
+            <DeploymentCard
+              key={deployment.id}
+              deployment={deployment}
+              onPress={handleDeploymentPress}
+            />
+          ))}
+        </View>
+      ) : (
+        <WWText>No deployments found.</WWText>
+      )}
+    </WWScreenView>
+  );
+};
+```
+
+### Creating a Deployment
+
+```typescript src/screens/AddDeployment.tsx
+import { useState } from 'react';
+import { useCreateDeploymentMutation } from '../../redux/api/deployments';
+import Geolocation from '@react-native-community/geolocation';
+
+const AddDeployment = () => {
+  const [locationName, setLocationName] = useState('');
+  const [comments, setComments] = useState('');
+  const [coordinates, setCoordinates] = useState<{
+    latitude: number;
+    longitude: number;
+  }>();
+  const [createDeployment, { isLoading }] = useCreateDeploymentMutation();
+
+  const getCurrentLocation = () => {
+    Geolocation.getCurrentPosition(
+      (position) => {
+        setCoordinates({
+          latitude: position.coords.latitude,
+          longitude: position.coords.longitude
+        });
+      },
+      (error) => console.error(error),
+      { enableHighAccuracy: true }
+    );
+  };
+
+  const handleSubmit = async () => {
+    try {
+      const deployment = await createDeployment({
+        data: {
+          locationName,
+          deploymentComments: comments,
+          latitude: coordinates?.latitude,
+          longitude: coordinates?.longitude,
+          startDate: new Date().toISOString()
+        }
+      }).unwrap();
+
+      console.log('Deployment created:', deployment);
+      navigation.goBack();
+    } catch (error) {
+      Alert.alert('Error', 'Failed to create deployment');
+    }
+  };
+
+  return (
+    <WWScreenView>
+      <WWTextInput
+        label="Location Name"
+        value={locationName}
+        onChangeText={setLocationName}
+      />
+      
+      <WWTextInput
+        label="Comments"
+        value={comments}
+        onChangeText={setComments}
+        multiline
+      />
+
+      <WWButton 
+        mode="outlined" 
+        onPress={getCurrentLocation}
+      >
+        Get Current Location
+      </WWButton>
+
+      {coordinates && (
+        <WWText>
+          Lat: {coordinates.latitude.toFixed(6)}, 
+          Lng: {coordinates.longitude.toFixed(6)}
+        </WWText>
+      )}
+
+      <WWButton
+        mode="contained"
+        onPress={handleSubmit}
+        loading={isLoading}
+        disabled={!locationName || isLoading}
+      >
+        Create Deployment
+      </WWButton>
+    </WWScreenView>
+  );
+};
+```
+
+### Updating a Deployment
+
+```typescript
+import { useUpdateDeploymentMutation } from '../../redux/api/deployments';
+
+const EditDeployment = ({ deploymentId }: { deploymentId: string }) => {
+  const { data: deployment } = useGetDeploymentByIdQuery(deploymentId);
+  const [updateDeployment] = useUpdateDeploymentMutation();
+  const [locationName, setLocationName] = useState(deployment?.locationName || '');
+
+  const handleUpdate = async () => {
+    await updateDeployment({
+      id: deploymentId,
+      body: {
+        data: { locationName }
+      }
+    });
+  };
+
+  // ... rest of component
+};
+```
+
+### Deleting a Deployment
+
+```typescript
+import { useDeleteDeploymentMutation } from '../../redux/api/deployments';
+
+const DeploymentActions = ({ deploymentId }: { deploymentId: string }) => {
+  const [deleteDeployment] = useDeleteDeploymentMutation();
+
+  const handleDelete = async () => {
+    await deleteDeployment(deploymentId);
+    navigation.goBack();
+  };
+
+  // ... rest of component
+};
+```
+
+## Deployment Card Component
+
+```typescript src/components/DeploymentCard.tsx
+import { Card } from 'react-native-paper';
+import { WWText } from './ui/WWText';
+
+type DeploymentCardProps = {
+  deployment: Deployment;
+  onPress: (id: string) => void;
+};
+
+export const DeploymentCard = ({ deployment, onPress }: DeploymentCardProps) => {
+  return (
+    <Card 
+      onPress={() => onPress(deployment.id)}
+      style={{ marginBottom: 8 }}
+    >
+      <Card.Content>
+        <WWText variant="titleMedium">
+          {deployment.locationName || `Deployment #${deployment.id.slice(-4)}`}
+        </WWText>
+        
+        {deployment.deploymentComments && (
+          <WWText variant="bodyMedium">
+            {deployment.deploymentComments}
+          </WWText>
+        )}
+        
+        {deployment.latitude && deployment.longitude && (
+          <WWText variant="bodySmall">
+            📍 {deployment.latitude.toFixed(4)}, {deployment.longitude.toFixed(4)}
+          </WWText>
+        )}
+        
+        <WWText variant="bodySmall">
+          Started: {new Date(deployment.startDate).toLocaleDateString()}
+        </WWText>
+      </Card.Content>
+    </Card>
+  );
+};
+```
+
+## Linking Deployments with Devices
+
+<Steps>
+
+<Step title="Scan for Devices">
+Start BLE scan to discover nearby devices:
+
+```typescript
+const { startScan } = useBleActions();
+startScan(10); // 10 second scan
+```
+</Step>
+
+<Step title="Select Device">
+User selects a device from the list of discovered devices.
+</Step>
+
+<Step title="Connect to Device">
+Connect to the selected device:
+
+```typescript
+const { connectDevice } = useBleActions();
+const connectedDevice = await connectDevice(selectedDevice);
+```
+</Step>
+
+<Step title="Read Device Information">
+Fetch device ID and other details via BLE commands:
+
+```typescript
+import { CommandNames, CommandControlTypes } from '../ble/types';
+
+const { write } = useBleActions();
+await write(device, [
+  [CommandNames.ID, { control: CommandControlTypes.READ }],
+  [CommandNames.VERSION, { control: CommandControlTypes.READ }]
+]);
+```
+</Step>
+
+<Step title="Update Deployment">
+Link the device to the deployment:
+
+```typescript
+const [updateDeployment] = useUpdateDeploymentMutation();
+
+await updateDeployment({
+  id: deploymentId,
+  body: {
+    data: {
+      deviceId: device.id
+    }
+  }
+});
+```
+</Step>
+
+</Steps>
+
+## Deployment Screen Integration
+
+The Deployments screen combines device scanning and deployment management:
+
+```typescript src/navigation/screens/Deployments.tsx
+import { useBleActions } from '../../providers/BleEngineProvider';
+import { useGetDeploymentsQuery } from '../../redux/api/deployments';
+
+const Deployments = memo(() => {
+  const { startScan, connectDevice, disconnectDevice, isBleConnecting } = useBleActions();
+  const devices = useAppSelector(state => state.devices);
+  const { isScanning } = useAppSelector(state => state.scanning);
+  const { data: deployments, isLoading } = useGetDeploymentsQuery();
+  
+  const devicesToDisplay = useMemo(() => {
+    return Object.values(devices)
+      .filter(device => !device.signalLost)
+      .sort((a, b) => b.rssi - a.rssi);
+  }, [devices]);
+
+  // Device list section
+  // Deployment list section
+  // Combined in single scrollable view
+});
+```
+
+## API Endpoints
+
+The app communicates with these endpoints:
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/api/projects` | GET | List all projects |
+| `/api/projects/:id` | GET | Get project by ID |
+| `/api/projects` | POST | Create new project |
+| `/api/projects/:id` | PUT | Update project |
+| `/api/projects/:id` | DELETE | Delete project |
+| `/api/deployments` | GET | List all deployments |
+| `/api/deployments/:id` | GET | Get deployment by ID |
+| `/api/deployments` | POST | Create new deployment |
+| `/api/deployments/:id` | PUT | Update deployment |
+| `/api/deployments/:id` | DELETE | Delete deployment |
+
+## Data Caching
+
+RTK Query automatically caches data and provides tags for cache invalidation:
+
+```typescript src/redux/api/projects/index.ts
+export const projectsApi = api.injectEndpoints({
+  endpoints: (builder) => ({
+    getProjects: builder.query<Project[], void>({
+      // ... query config
+      providesTags: (result) =>
+        result
+          ? [
+              ...result.map(({ id }) => ({ type: 'Project' as const, id })),
+              { type: 'Project', id: 'LIST' }
+            ]
+          : [{ type: 'Project', id: 'LIST' }]
+    }),
+    
+    createProject: builder.mutation<Project, ProjectCreate>({
+      // ... mutation config
+      invalidatesTags: [{ type: 'Project', id: 'LIST' }]
+    })
+  })
+});
+```
+
+<Note>
+When a project is created, updated, or deleted, the cache is automatically invalidated and the project list refetches.
+</Note>
+
+## Best Practices
+
+<Card title="Data Fetching" icon="download">
+- Use RTK Query hooks for automatic caching and refetching
+- Show loading states with `WWLoader` component
+- Handle error states gracefully
+</Card>
+
+<Card title="Location Data" icon="location-dot">
+- Always request location permissions before accessing GPS
+- Provide fallback for devices without GPS
+- Store coordinates with sufficient precision (6 decimal places)
+</Card>
+
+<Card title="User Experience" icon="user">
+- Show deployment locations on map for visual context
+- Allow editing deployment details after creation
+- Provide confirmation dialogs for destructive actions
+</Card>
+
+## Related
+
+- [Maps & Observations](/features/maps-observations) - Visualizing deployments on maps
+- [Device Management](/features/device-management) - Managing BLE devices

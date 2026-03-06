@@ -1,0 +1,347 @@
+---
+title: 'useAppNavigation'
+description: 'Type-safe navigation hook for the Wildlife Watcher app'
+---
+
+## Overview
+
+The `useAppNavigation` hook provides a type-safe wrapper around React Navigation's `useNavigation` hook, ensuring all navigation calls are properly typed with the app's route parameters.
+
+## Import
+
+```typescript
+import { useAppNavigation } from '../hooks/useAppNavigation'
+```
+
+## Usage
+
+```typescript
+import { useAppNavigation } from '../hooks/useAppNavigation'
+
+const MyScreen = () => {
+  const navigation = useAppNavigation()
+  
+  const goToTerminal = (deviceId: string) => {
+    navigation.navigate('Terminal', { deviceId })
+  }
+  
+  const goToSettings = () => {
+    navigation.navigate('Settings')
+  }
+  
+  const goBack = () => {
+    navigation.goBack()
+  }
+  
+  return (
+    <View>
+      <Button onPress={() => goToTerminal('device-123')}>
+        Open Terminal
+      </Button>
+      <Button onPress={goToSettings}>
+        Settings
+      </Button>
+      <Button onPress={goBack}>
+        Back
+      </Button>
+    </View>
+  )
+}
+```
+
+## Return Value
+
+<ResponseField name="navigation" type="NativeStackNavigationProp<RootStackParamList>">
+  A fully-typed navigation object with methods for navigating between screens. Common methods include:
+  
+  - `navigate(route, params?)` - Navigate to a route
+  - `goBack()` - Go back to the previous screen
+  - `push(route, params?)` - Push a new screen onto the stack
+  - `replace(route, params?)` - Replace current screen
+  - `reset(state)` - Reset navigation state
+  - `setOptions(options)` - Update screen options
+</ResponseField>
+
+## Route Parameters
+
+The hook enforces type safety for all routes defined in `RootStackParamList`:
+
+```typescript
+interface RootStackParamList {
+  CommunityDiscussion: undefined
+  Notifications: undefined
+  Profile: undefined
+  Settings: undefined
+  Home: undefined
+  DeviceNavigator: { deviceId: string }
+  Terminal: { deviceId: string }
+  DfuScreen: { deviceId: string }
+  Login: undefined
+  Register: undefined
+  AddDeployment: { selectedProject?: Option } | undefined
+  AddProject: undefined
+}
+```
+
+## Real-World Examples
+
+<CodeGroup>
+```typescript Deployments.tsx
+import { useAppNavigation } from '../../hooks/useAppNavigation'
+import { ExtendedPeripheral } from '../../redux/slices/devicesSlice'
+
+const Deployments = () => {
+  const navigation = useAppNavigation()
+  
+  const handleDeviceSelect = (device: ExtendedPeripheral) => {
+    // TypeScript ensures deviceId parameter is provided
+    navigation.navigate('Terminal', { deviceId: device.id })
+  }
+  
+  const handleAddDeployment = () => {
+    navigation.navigate('AddDeployment')
+  }
+  
+  return (
+    <View>
+      <FlatList
+        data={devices}
+        renderItem={({ item }) => (
+          <DeviceItem 
+            device={item}
+            onPress={() => handleDeviceSelect(item)}
+          />
+        )}
+      />
+      <Button onPress={handleAddDeployment}>
+        Add Deployment
+      </Button>
+    </View>
+  )
+}
+```
+
+```typescript Login.tsx
+import { useAppNavigation } from '../../hooks/useAppNavigation'
+
+const Login = () => {
+  const navigation = useAppNavigation()
+  
+  const handleLoginSuccess = () => {
+    // Reset navigation stack after login
+    navigation.reset({
+      index: 0,
+      routes: [{ name: 'Home' }],
+    })
+  }
+  
+  const goToRegister = () => {
+    navigation.navigate('Register')
+  }
+  
+  return (
+    <View>
+      <Button onPress={handleLoginSuccess}>
+        Login
+      </Button>
+      <Button onPress={goToRegister}>
+        Create Account
+      </Button>
+    </View>
+  )
+}
+```
+
+```typescript DfuScreen.tsx
+import { useAppNavigation } from '../../hooks/useAppNavigation'
+import { useRoute } from '@react-navigation/native'
+
+const DfuScreen = () => {
+  const navigation = useAppNavigation()
+  const route = useRoute<AppParams<'DfuScreen'>>()
+  const { deviceId } = route.params
+  
+  const handleDfuComplete = () => {
+    // Go back to previous screen
+    navigation.goBack()
+  }
+  
+  const handleDfuError = () => {
+    // Navigate to terminal with device ID
+    navigation.replace('Terminal', { deviceId })
+  }
+  
+  return (
+    <View>
+      <Text>Updating firmware for {deviceId}</Text>
+      <Button onPress={handleDfuComplete}>Done</Button>
+    </View>
+  )
+}
+```
+
+```typescript AddDeployment.tsx
+import { useAppNavigation } from '../../hooks/useAppNavigation'
+import { useRoute } from '@react-navigation/native'
+import type { Option } from '../components/ui/WWSelect'
+
+const AddDeployment = () => {
+  const navigation = useAppNavigation()
+  const route = useRoute<AppParams<'AddDeployment'>>()
+  const selectedProject = route.params?.selectedProject
+  
+  const handleAddProject = () => {
+    navigation.navigate('AddProject')
+  }
+  
+  const handleComplete = () => {
+    // Navigate back to home after creating deployment
+    navigation.navigate('Home')
+  }
+  
+  return (
+    <View>
+      {selectedProject ? (
+        <Text>Project: {selectedProject.label}</Text>
+      ) : (
+        <Button onPress={handleAddProject}>
+          Select Project
+        </Button>
+      )}
+      <Button onPress={handleComplete}>Create Deployment</Button>
+    </View>
+  )
+}
+```
+</CodeGroup>
+
+## Type Safety Benefits
+
+The hook provides compile-time type checking for:
+
+### Required Parameters
+
+```typescript
+// ✅ Correct - deviceId is required
+navigation.navigate('Terminal', { deviceId: 'device-123' })
+
+// ❌ TypeScript Error - missing required parameter
+navigation.navigate('Terminal')
+
+// ❌ TypeScript Error - wrong parameter type
+navigation.navigate('Terminal', { deviceId: 123 })
+```
+
+### Optional Parameters
+
+```typescript
+// ✅ Both are valid for AddDeployment
+navigation.navigate('AddDeployment')
+navigation.navigate('AddDeployment', { selectedProject: project })
+```
+
+### No Parameters
+
+```typescript
+// ✅ Correct - no parameters needed
+navigation.navigate('Settings')
+navigation.navigate('Home')
+navigation.navigate('Profile')
+
+// ❌ TypeScript Error - unexpected parameters
+navigation.navigate('Settings', { someParam: 'value' })
+```
+
+## Implementation
+
+```typescript
+import { RootStackParamList } from '../navigation'
+import { useNavigation } from '@react-navigation/native'
+import { NativeStackNavigationProp } from '@react-navigation/native-stack'
+
+export const useAppNavigation = () =>
+  useNavigation<NativeStackNavigationProp<RootStackParamList>>()
+```
+
+## Accessing Route Parameters
+
+Use with `useRoute` to access route parameters in the destination screen:
+
+```typescript
+import { useRoute } from '@react-navigation/native'
+import { AppParams } from '../navigation'
+
+const TerminalScreen = () => {
+  const route = useRoute<AppParams<'Terminal'>>()
+  const { deviceId } = route.params // Fully typed!
+  
+  return <Terminal deviceId={deviceId} />
+}
+```
+
+## Common Navigation Patterns
+
+### Navigate with Device
+
+```typescript
+const connectAndNavigate = async (device: ExtendedPeripheral) => {
+  await connectDevice(device)
+  navigation.navigate('Terminal', { deviceId: device.id })
+}
+```
+
+### Replace Screen
+
+```typescript
+// Replace current screen (no back navigation)
+navigation.replace('Home')
+```
+
+### Go Back with Callback
+
+```typescript
+const saveAndGoBack = async () => {
+  await saveSettings()
+  navigation.goBack()
+}
+```
+
+### Navigate with Options
+
+```typescript
+navigation.navigate('Terminal', { 
+  deviceId: device.id 
+})
+
+// Update screen options
+navigation.setOptions({
+  title: `Device ${device.name}`,
+  headerRight: () => <HeaderButton />
+})
+```
+
+## Navigation Stack Structure
+
+```typescript
+RootStack
+├── Home
+├── Deployments (Bottom Tab)
+├── Projects (Bottom Tab)
+├── Map (Bottom Tab)
+├── Terminal (Modal)
+│   └── params: { deviceId: string }
+├── DfuScreen (Modal)
+│   └── params: { deviceId: string }
+├── AddDeployment
+│   └── params?: { selectedProject?: Option }
+├── AddProject
+├── Settings
+├── Profile
+└── ...
+```
+
+## Related
+
+- [React Navigation Docs](https://reactnavigation.org/docs/navigation-prop)
+- [TypeScript Guide](https://reactnavigation.org/docs/typescript)
+- [Navigation Index](../navigation/index) - Route definitions

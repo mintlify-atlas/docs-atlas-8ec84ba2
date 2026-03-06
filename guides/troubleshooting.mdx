@@ -1,0 +1,621 @@
+---
+title: Troubleshooting
+description: Solutions to common issues with BLE connections, permissions, and device setup
+icon: wrench
+---
+
+This guide provides solutions to common issues you may encounter when developing or using the Wildlife Watcher mobile app.
+
+## Bluetooth Low Energy Issues
+
+### BLE Scanning Not Working
+
+<Accordion title="Permissions not granted">
+  **Problem**: BLE scan starts but no devices are discovered.
+
+  **Solution**: Verify all required permissions are granted.
+
+  ```typescript
+  import { PermissionsAndroid, Platform } from 'react-native';
+
+  const checkBLEPermissions = async () => {
+    if (Platform.OS === 'android') {
+      const apiLevel = Platform.Version as number;
+      
+      if (apiLevel >= 31) {
+        // Android 12+
+        const permissions = [
+          PermissionsAndroid.PERMISSIONS.BLUETOOTH_SCAN,
+          PermissionsAndroid.PERMISSIONS.BLUETOOTH_CONNECT,
+          PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION,
+        ];
+        
+        const results = await PermissionsAndroid.requestMultiple(permissions);
+        
+        return Object.values(results).every(result => result === 'granted');
+      }
+    }
+    return true;
+  };
+  ```
+
+  <Warning>
+    On Android 12+, both `BLUETOOTH_SCAN` and `ACCESS_FINE_LOCATION` are required for scanning to work.
+  </Warning>
+</Accordion>
+
+<Accordion title="Location services disabled">
+  **Problem**: Permissions granted but scan still finds no devices.
+
+  **Solution**: Ensure location services are enabled (required on Android).
+
+  ```typescript
+  import deviceInfoModule from 'react-native-device-info';
+
+  const checkLocationEnabled = async () => {
+    try {
+      const enabled = await deviceInfoModule.isLocationEnabled();
+      
+      if (!enabled) {
+        Alert.alert(
+          'Location Required',
+          'Please enable location services to scan for BLE devices.',
+          [
+            { text: 'Cancel', style: 'cancel' },
+            { text: 'Open Settings', onPress: () => Linking.openSettings() }
+          ]
+        );
+        return false;
+      }
+      
+      return true;
+    } catch (error) {
+      console.error('Location check failed:', error);
+      return false;
+    }
+  };
+  ```
+</Accordion>
+
+<Accordion title="Bluetooth adapter powered off">
+  **Problem**: BLE operations fail with "PoweredOff" state.
+
+  **Solution**: Check and prompt user to enable Bluetooth.
+
+  ```typescript
+  import BluetoothStateManager from 'react-native-bluetooth-state-manager';
+
+  const checkBluetoothEnabled = async () => {
+    const state = await BluetoothStateManager.getState();
+    
+    if (state !== 'PoweredOn') {
+      Alert.alert(
+        'Bluetooth Required',
+        'Please enable Bluetooth to connect to devices.',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          {
+            text: 'Enable',
+            onPress: async () => {
+              await BluetoothStateManager.enable();
+            }
+          }
+        ]
+      );
+      return false;
+    }
+    
+    return true;
+  };
+  ```
+</Accordion>
+
+<Accordion title="BLE Manager not initialized">
+  **Problem**: App crashes when attempting BLE operations.
+
+  **Solution**: Ensure BLE Manager is started before any BLE operations.
+
+  ```typescript
+  import BleManager from 'react-native-ble-manager';
+
+  useEffect(() => {
+    // Start BLE Manager on mount
+    BleManager.start({ showAlert: false })
+      .then(() => {
+        console.log('BLE Manager initialized');
+      })
+      .catch((error) => {
+        console.error('BLE Manager failed to start:', error);
+      });
+  }, []);
+  ```
+</Accordion>
+
+### BLE Connection Issues
+
+<Accordion title="Connection timeout">
+  **Problem**: Device connection times out or fails.
+
+  **Solution**: Implement retry logic with exponential backoff.
+
+  ```typescript
+  const connectWithRetry = async (
+    peripheralId: string,
+    maxRetries = 3,
+    delay = 1000
+  ) => {
+    for (let i = 0; i < maxRetries; i++) {
+      try {
+        await BleManager.connect(peripheralId);
+        console.log(`Connected to ${peripheralId}`);
+        
+        // Retrieve services after connection
+        await BleManager.retrieveServices(peripheralId);
+        
+        return true;
+      } catch (error) {
+        console.log(`Connection attempt ${i + 1} failed:`, error);
+        
+        if (i < maxRetries - 1) {
+          await new Promise(resolve => setTimeout(resolve, delay * (i + 1)));
+        }
+      }
+    }
+    
+    throw new Error(`Failed to connect after ${maxRetries} attempts`);
+  };
+  ```
+</Accordion>
+
+<Accordion title="Device disconnects unexpectedly">
+  **Problem**: Connected device disconnects without warning.
+
+  **Solution**: Monitor disconnect events and implement reconnection.
+
+  ```typescript
+  import { NativeEventEmitter, NativeModules } from 'react-native';
+
+  const BleManagerModule = NativeModules.BleManager;
+  const bleManagerEmitter = new NativeEventEmitter(BleManagerModule);
+
+  useEffect(() => {
+    const disconnectListener = bleManagerEmitter.addListener(
+      'BleManagerDisconnectPeripheral',
+      async (data) => {
+        console.log('Device disconnected:', data.peripheral);
+        
+        // Attempt reconnection
+        try {
+          await connectWithRetry(data.peripheral);
+        } catch (error) {
+          console.error('Reconnection failed:', error);
+        }
+      }
+    );
+    
+    return () => disconnectListener.remove();
+  }, []);
+  ```
+</Accordion>
+
+<Accordion title="Cannot read/write characteristics">
+  **Problem**: Read or write operations fail with "service not found" error.
+
+  **Solution**: Ensure services are retrieved after connection.
+
+  ```typescript
+  const setupDevice = async (peripheralId: string) => {
+    try {
+      // 1. Connect
+      await BleManager.connect(peripheralId);
+      
+      // 2. Retrieve services (REQUIRED)
+      const peripheralInfo = await BleManager.retrieveServices(peripheralId);
+      console.log('Services:', peripheralInfo.services);
+      
+      // 3. Enable notifications
+      await BleManager.startNotification(
+        peripheralId,
+        SERVICE_UUID,
+        CHARACTERISTIC_UUID
+      );
+      
+      // 4. Now you can read/write
+      await BleManager.write(
+        peripheralId,
+        SERVICE_UUID,
+        CHARACTERISTIC_UUID,
+        data
+      );
+    } catch (error) {
+      console.error('Device setup failed:', error);
+    }
+  };
+  ```
+</Accordion>
+
+## Permission Issues
+
+### Android Permissions
+
+<Accordion title="Permissions permanently denied">
+  **Problem**: User selected "Don't ask again" when denying permissions.
+
+  **Solution**: Direct user to system settings.
+
+  ```typescript
+  import { Linking } from 'react-native';
+
+  const handlePermanentDenial = () => {
+    Alert.alert(
+      'Permissions Required',
+      'You have permanently denied required permissions. Please enable them in system settings.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Open Settings',
+          onPress: () => Linking.openSettings()
+        }
+      ]
+    );
+  };
+
+  // Check for permanent denial
+  const results = await PermissionsAndroid.requestMultiple(PERMISSIONS);
+  const neverAskAgain = Object.entries(results).filter(
+    ([_, status]) => status === 'never_ask_again'
+  );
+
+  if (neverAskAgain.length > 0) {
+    handlePermanentDenial();
+  }
+  ```
+</Accordion>
+
+<Accordion title="Permission check always returns false">
+  **Problem**: `PermissionsAndroid.check()` returns false even after granting.
+
+  **Solution**: Request permissions first, then check.
+
+  ```typescript
+  // WRONG: Checking without requesting
+  const hasPermission = await PermissionsAndroid.check(
+    PermissionsAndroid.PERMISSIONS.BLUETOOTH_SCAN
+  );
+
+  // CORRECT: Request first
+  const granted = await PermissionsAndroid.request(
+    PermissionsAndroid.PERMISSIONS.BLUETOOTH_SCAN
+  );
+
+  if (granted === PermissionsAndroid.RESULTS.GRANTED) {
+    // Permission granted
+  }
+  ```
+</Accordion>
+
+### iOS Permissions
+
+<Accordion title="Permission prompt not showing">
+  **Problem**: iOS doesn't prompt for Bluetooth or location permission.
+
+  **Solution**: Verify Info.plist contains required descriptions.
+
+  ```xml
+  <!-- Check ios/WildlifeWatcher/Info.plist -->
+  <key>NSBluetoothAlwaysUsageDescription</key>
+  <string>This app uses BLE to communicate with Wildlife Watcher devices</string>
+
+  <key>NSBluetoothPeripheralUsageDescription</key>
+  <string>We need access to your bluetooth connection to connect to your devices and enable their remote configuration.</string>
+
+  <key>NSLocationWhenInUseUsageDescription</key>
+  <string>We need access to your location to show your position on the map.</string>
+  ```
+
+  <Warning>
+    Missing or empty permission descriptions will cause iOS to reject your app or crash at runtime.
+  </Warning>
+</Accordion>
+
+## Build Issues
+
+<Accordion title="Android build fails with permission errors">
+  **Problem**: Build fails with errors about permissions in manifest.
+
+  **Solution**: Ensure manifest permissions are properly formatted.
+
+  ```xml
+  <!-- Correct format -->
+  <uses-permission 
+    android:name="android.permission.BLUETOOTH_CONNECT" 
+    android:usesPermissionFlags="neverForLocation" />
+
+  <!-- Not: -->
+  <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" 
+                   android:usesPermissionFlags="neverForLocation"/>
+  ```
+</Accordion>
+
+<Accordion title="iOS build fails - pod install errors">
+  **Problem**: CocoaPods dependencies fail to install.
+
+  **Solution**: Clean and reinstall pods.
+
+  ```bash
+  cd ios
+  rm -rf Pods Podfile.lock
+  bundle install
+  bundle exec pod install --repo-update
+  cd ..
+  ```
+</Accordion>
+
+<Accordion title="Metro bundler cache issues">
+  **Problem**: App doesn't reflect code changes or shows old errors.
+
+  **Solution**: Reset Metro bundler cache.
+
+  ```bash
+  # Clear Metro cache
+  npx react-native start --reset-cache
+
+  # Or clear all caches
+  watchman watch-del-all
+  rm -rf node_modules
+  npm install
+  npx react-native start --reset-cache
+  ```
+</Accordion>
+
+## API and Authentication Issues
+
+<Accordion title="API requests return 401 Unauthorized">
+  **Problem**: All API requests fail with 401 error.
+
+  **Solution**: Verify JWT token is being sent correctly.
+
+  ```typescript
+  import { useAppSelector } from '../redux';
+
+  const { token } = useAppSelector(state => state.authentication);
+
+  console.log('Token:', token ? 'Present' : 'Missing');
+
+  // Check if token is in headers
+  const testAPI = async () => {
+    const response = await fetch(`${Config.API_BASE}/api/users/me`, {
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+    });
+    console.log('Status:', response.status);
+  };
+  ```
+</Accordion>
+
+<Accordion title="API_BASE undefined">
+  **Problem**: API requests fail with "Cannot read property 'API_BASE' of undefined".
+
+  **Solution**: Ensure `.env` file exists and contains `API_BASE`.
+
+  ```bash
+  # Create .env file
+  echo "API_BASE=https://api.wildlife.ai" > .env
+
+  # Rebuild app (environment variables are embedded at build time)
+  npx react-native run-android
+  # or
+  npx react-native run-ios
+  ```
+
+  <Note>
+    You must rebuild the app after changing `.env` files. React Native Config embeds variables at build time, not runtime.
+  </Note>
+</Accordion>
+
+<Accordion title="CORS errors in development">
+  **Problem**: API requests fail with CORS errors.
+
+  **Solution**: CORS errors shouldn't occur in React Native (only in web browsers). If you see them:
+
+  1. Verify you're running on a real device/emulator, not a web browser
+  2. Check your API server allows requests from your IP
+  3. Ensure `API_BASE` uses `https://` not `http://` in production
+</Accordion>
+
+## Device-Specific Issues
+
+<Accordion title="Works on Android but not iOS (or vice versa)">
+  **Problem**: App works perfectly on one platform but fails on another.
+
+  **Solution**: Check platform-specific implementations.
+
+  ```typescript
+  import { Platform } from 'react-native';
+
+  const handleBLEOperation = async () => {
+    if (Platform.OS === 'android') {
+      // Android requires additional permission checks
+      const hasPermissions = await checkAndroidPermissions();
+      if (!hasPermissions) return;
+    }
+
+    // Common BLE operation
+    await BleManager.scan([], 5);
+  };
+  ```
+
+  **Common differences:**
+  - Android requires location services for BLE scanning
+  - iOS prompts for permissions automatically
+  - Android 12+ requires new Bluetooth permissions
+</Accordion>
+
+<Accordion title="App crashes on older Android devices">
+  **Problem**: App crashes on Android 11 or below.
+
+  **Solution**: Ensure legacy Bluetooth permissions are included.
+
+  ```xml
+  <!-- Required for Android 11 and below -->
+  <uses-permission 
+    android:name="android.permission.BLUETOOTH" 
+    android:maxSdkVersion="30" />
+  <uses-permission 
+    android:name="android.permission.BLUETOOTH_ADMIN" 
+    android:maxSdkVersion="30" />
+  ```
+</Accordion>
+
+## DFU (Device Firmware Update) Issues
+
+<Accordion title="DFU progress not showing">
+  **Problem**: Firmware update starts but no progress notifications appear.
+
+  **Solution**: Request notification permission on Android 13+.
+
+  ```typescript
+  import { PermissionsAndroid, Platform } from 'react-native';
+
+  const startDFU = async () => {
+    if (Platform.OS === 'android' && Platform.Version >= 33) {
+      const granted = await PermissionsAndroid.request(
+        PermissionsAndroid.PERMISSIONS.POST_NOTIFICATIONS
+      );
+
+      if (granted !== PermissionsAndroid.RESULTS.GRANTED) {
+        console.warn('Notification permission denied');
+      }
+    }
+
+    // Start DFU process
+    await NordicDFU.startDFU({
+      deviceAddress: peripheral.id,
+      filePath: firmwarePath,
+    });
+  };
+  ```
+</Accordion>
+
+<Accordion title="DFU fails with connection error">
+  **Problem**: DFU process fails immediately after starting.
+
+  **Solution**: Ensure device is connected and in DFU mode.
+
+  ```typescript
+  const prepareDFU = async (peripheralId: string) => {
+    try {
+      // 1. Check connection
+      const isConnected = await BleManager.isPeripheralConnected(
+        peripheralId,
+        []
+      );
+
+      if (!isConnected) {
+        await BleManager.connect(peripheralId);
+      }
+
+      // 2. Send command to enter DFU mode (if required by your device)
+      await sendEnterDFUCommand(peripheralId);
+
+      // 3. Wait for device to restart in DFU mode
+      await new Promise(resolve => setTimeout(resolve, 2000));
+
+      // 4. Start DFU
+      await NordicDFU.startDFU({
+        deviceAddress: peripheralId,
+        filePath: firmwarePath,
+      });
+    } catch (error) {
+      console.error('DFU preparation failed:', error);
+    }
+  };
+  ```
+</Accordion>
+
+## Debugging Tips
+
+### Enable Verbose Logging
+
+```typescript
+import { LogBox } from 'react-native';
+
+// In development, show all logs
+if (__DEV__) {
+  console.log('Debug mode enabled');
+  
+  // Optionally ignore specific warnings
+  LogBox.ignoreLogs([
+    'Non-serializable values were found in the navigation state',
+  ]);
+}
+```
+
+### BLE Debug Logging
+
+```typescript
+import BleManager from 'react-native-ble-manager';
+
+// Log all BLE events
+const logBLEEvents = () => {
+  const events = [
+    'BleManagerDiscoverPeripheral',
+    'BleManagerStopScan',
+    'BleManagerConnectPeripheral',
+    'BleManagerDisconnectPeripheral',
+    'BleManagerDidUpdateValueForCharacteristic',
+  ];
+
+  events.forEach(event => {
+    bleManagerEmitter.addListener(event, (data) => {
+      console.log(`[BLE Event] ${event}:`, data);
+    });
+  });
+};
+```
+
+### Test on Real Devices
+
+<Warning>
+  Always test BLE functionality on real devices. Emulators and simulators have limited or no BLE support.
+</Warning>
+
+```bash
+# Android - List connected devices
+adb devices
+
+# iOS - List available simulators
+xcrun simctl list devices
+
+# Run on specific device
+npx react-native run-android --deviceId=DEVICE_ID
+npx react-native run-ios --device="iPhone Name"
+```
+
+## Getting Help
+
+If you're still experiencing issues:
+
+1. **Check the logs**: Use `npx react-native log-android` or `npx react-native log-ios`
+2. **Search GitHub issues**: [Wildlife Watcher Issues](https://github.com/wildlifeai/wildlife-watcher-mobile-app/issues)
+3. **Review React Native BLE Manager docs**: [GitHub](https://github.com/innoveit/react-native-ble-manager)
+4. **Test with example apps**: Clone and test the BLE Manager example app to isolate issues
+
+## Related Resources
+
+<CardGroup cols={2}>
+  <Card title="Configuration" icon="gear" href="/guides/configuration">
+    Review configuration settings
+  </Card>
+  <Card title="Permissions" icon="shield-check" href="/guides/permissions">
+    Verify permission setup
+  </Card>
+  <Card title="Authentication" icon="lock" href="/guides/authentication">
+    Check authentication flow
+  </Card>
+  <Card title="Project Structure" icon="code" href="/development/project-structure">
+    Development environment setup
+  </Card>
+</CardGroup>

@@ -1,0 +1,246 @@
+---
+title: Configuration
+description: Configure your Wildlife Watcher mobile app with environment variables and platform-specific settings
+icon: gear
+---
+
+The Wildlife Watcher mobile app uses `react-native-config` to manage environment-specific configuration. This guide covers setting up your configuration for development and production environments.
+
+## Environment Variables
+
+Create a `.env` file in the root of your project to configure the app's API endpoint and other environment-specific settings.
+
+### Required Variables
+
+<Steps>
+  <Step title="Create .env file">
+    Create a `.env` file in the project root:
+
+    ```bash
+    touch .env
+    ```
+  </Step>
+
+  <Step title="Add API configuration">
+    Add the following required variables:
+
+    ```bash
+    # API Configuration
+    API_BASE=https://api.wildlife.ai
+    ```
+
+    <Note>
+      The `API_BASE` variable is used throughout the app to construct API endpoints. All API requests are prefixed with `/api` (e.g., `https://api.wildlife.ai/api/auth/local`).
+    </Note>
+  </Step>
+
+  <Step title="Access configuration in code">
+    Environment variables are accessed using `react-native-config`:
+
+    ```typescript
+    import Config from 'react-native-config';
+
+    const apiBase = Config.API_BASE;
+    ```
+  </Step>
+</Steps>
+
+### Environment-Specific Configuration
+
+You can create multiple environment files:
+
+- `.env` - Default configuration
+- `.env.development` - Development environment
+- `.env.staging` - Staging environment
+- `.env.production` - Production environment
+
+<Warning>
+  Never commit `.env` files containing sensitive data to version control. Add them to `.gitignore`.
+</Warning>
+
+## API Configuration
+
+The app uses Redux Toolkit Query with a custom base query configured in `src/redux/api/fetch.ts`.
+
+### Base Query Setup
+
+```typescript
+import { fetchBaseQuery } from '@reduxjs/toolkit/query';
+import Config from 'react-native-config';
+
+export const extendedBaseQuery = fetchBaseQuery({
+  baseUrl: Config.API_BASE,
+  prepareHeaders: (headers, { getState }) => {
+    const token = (getState() as RootState).authentication.token;
+    
+    if (token) {
+      headers.set('Authorization', `Bearer ${token}`);
+    }
+    
+    headers.set('Content-type', 'application/json');
+    return headers;
+  },
+});
+```
+
+### Available API Endpoints
+
+The app includes the following API endpoints (defined in `src/redux/api/urls.ts`):
+
+<Accordion title="Authentication Endpoints">
+  - `POST /api/auth/local` - User login
+  - `POST /api/auth/local/register` - User registration
+  - `GET /api/users/me` - Get current user profile
+</Accordion>
+
+<Accordion title="Device Management">
+  - `GET /api/devices` - List all devices
+  - `GET /api/devices/:id` - Get device by ID
+  - `POST /api/devices` - Create new device
+  - `PUT /api/devices/:id` - Update device
+  - `DELETE /api/devices/:id` - Delete device
+</Accordion>
+
+<Accordion title="Observations & Data">
+  - `GET /api/observations` - List observations
+  - `GET /api/projects` - List projects
+  - `GET /api/deployments` - List deployments
+  - `GET /api/sensorrecords` - List sensor records
+  - `GET /api/media` - List media files
+</Accordion>
+
+## Platform-Specific Configuration
+
+### Android Configuration
+
+#### Google Maps API Key
+
+The app uses Google Maps for location features. Configure the API key in `android/app/build.gradle`:
+
+```groovy
+android {
+  defaultConfig {
+    manifestPlaceholders = [
+      googleMapsApiKey: System.getenv("GOOGLE_MAPS_API_KEY") ?: ""
+    ]
+  }
+}
+```
+
+The key is referenced in `AndroidManifest.xml`:
+
+```xml
+<meta-data
+  android:name="com.google.android.geo.API_KEY"
+  android:value="${googleMapsApiKey}"/>
+```
+
+### iOS Configuration
+
+#### URL Schemes
+
+The app is configured with a custom URL scheme for deep linking and OAuth redirects (defined in `Info.plist`):
+
+```xml
+<key>CFBundleURLTypes</key>
+<array>
+  <dict>
+    <key>CFBundleURLName</key>
+    <string>com.wildlife.watcher</string>
+    <key>CFBundleURLSchemes</key>
+    <array>
+      <string>com.wildlife.auth</string>
+    </array>
+  </dict>
+</array>
+```
+
+<Note>
+  This URL scheme (`com.wildlife.auth://`) can be used for OAuth callbacks with `react-native-app-auth`.
+</Note>
+
+## Redux Store Configuration
+
+The app uses Redux Toolkit for state management with the following slices:
+
+- **Authentication** (`authSlice`) - User authentication state
+- **Android Permissions** (`androidPermissionsSlice`) - Permission status
+- **Bluetooth Status** (`bluetoothStatusSlice`) - BLE connection state
+- **Location Status** (`locationStatusSlice`) - GPS status
+- **Devices** (`devicesSlice`) - Connected BLE devices
+
+### Storage
+
+Authentication state is persisted using `@react-native-async-storage/async-storage`:
+
+```typescript
+import AsyncStorage from '@react-native-async-storage/async-storage';
+
+export const AUTH_STORAGE_KEY = 'auth';
+
+// Store auth data
+await AsyncStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(authData));
+
+// Retrieve auth data
+const authData = await AsyncStorage.getItem(AUTH_STORAGE_KEY);
+```
+
+## Network Security
+
+### Android
+
+The app uses clear text traffic for development. This is enabled in `AndroidManifest.xml`:
+
+```xml
+<application
+  android:usesCleartextTraffic="true">
+  <!-- ... -->
+</application>
+```
+
+<Warning>
+  Disable clear text traffic in production builds by setting `android:usesCleartextTraffic="false"`.
+</Warning>
+
+### iOS
+
+App Transport Security (ATS) is configured in `Info.plist`:
+
+```xml
+<key>NSAppTransportSecurity</key>
+<dict>
+  <key>NSAllowsArbitraryLoads</key>
+  <false/>
+  <key>NSAllowsLocalNetworking</key>
+  <true/>
+</dict>
+```
+
+## Build Configuration
+
+### Node Version
+
+The app requires Node.js version 18 or higher (specified in `package.json`):
+
+```json
+{
+  "engines": {
+    "node": ">=18"
+  }
+}
+```
+
+### React Native Version
+
+The app is built with React Native 0.74.6 and React 18.2.0.
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Authentication" icon="lock" href="/guides/authentication">
+    Set up user authentication and OAuth
+  </Card>
+  <Card title="Permissions" icon="shield-check" href="/guides/permissions">
+    Configure BLE and location permissions
+  </Card>
+</CardGroup>

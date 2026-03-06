@@ -1,0 +1,144 @@
+---
+title: Installation
+description: Set up your development environment for the Wildlife Watcher mobile app
+---
+
+## Prerequisites
+
+Before installing the Wildlife Watcher mobile app, ensure your development environment meets the following requirements:
+
+<Steps>
+  <Step title="Node.js 18 or higher">
+    The app requires Node.js version 18 or higher. Check your version:
+    
+    ```bash
+    node --version
+    ```
+    
+    If you need to install or upgrade Node.js, download it from [nodejs.org](https://nodejs.org/) or use a version manager like [nvm](https://github.com/nvm-sh/nvm).
+  </Step>
+
+  <Step title="Ruby 2.6.10 or higher">
+    Ruby is required for iOS development. Verify your installation:
+    
+    ```bash
+    ruby --version
+    ```
+    
+    Install Ruby using [rbenv](https://github.com/rbenv/rbenv) or [rvm](https://rvm.io/) if needed.
+  </Step>
+
+  <Step title="React Native environment">
+    Follow the official React Native environment setup for your platform:
+    
+    [React Native - Set up your environment](https://reactnative.dev/docs/set-up-your-environment)
+    
+    <Note>
+      If you can successfully run a fresh React Native app, you should be able to run Wildlife Watcher without any problems.
+    </Note>
+  </Step>
+</Steps>
+
+## Installing Dependencies
+
+Clone the repository and install project dependencies:
+
+<Steps>
+  <Step title="Clone the repository">
+    ```bash
+    git clone https://github.com/wildlifeai/wildlife-watcher-mobile-app.git
+    cd wildlife-watcher-mobile-app
+    ```
+  </Step>
+
+  <Step title="Install npm packages">
+    ```bash
+    npm install
+    ```
+    
+    This will install all dependencies defined in `package.json`, including:
+    - React Native core and navigation libraries
+    - Bluetooth Low Energy manager
+    - Redux Toolkit for state management
+    - Firebase SDK
+    - React Native Paper UI components
+  </Step>
+</Steps>
+
+## iOS Setup
+
+For iOS development, additional setup is required for CocoaPods and native dependencies:
+
+<Steps>
+  <Step title="Install Bundler">
+    Bundler manages Ruby gem dependencies:
+    
+    ```bash
+    gem install bundler
+    ```
+  </Step>
+
+  <Step title="Install Ruby gems">
+    ```bash
+    bundle install
+    ```
+  </Step>
+
+  <Step title="Install CocoaPods dependencies">
+    ```bash
+    bundle exec pod install --project-directory=ios
+    ```
+    
+    Alternatively, you can use the npm script:
+    
+    ```bash
+    npm run pod-install
+    ```
+    
+    <Note>
+      CocoaPods installation may take several minutes as it downloads native iOS dependencies.
+    </Note>
+  </Step>
+</Steps>
+
+## Android Setup
+
+For Android development, ensure you have Android Studio and the Android SDK installed as per the React Native environment setup guide.
+
+<Note>
+  The Android setup requires:
+  - Android Studio with Android SDK
+  - Android SDK Platform 33 or higher
+  - Android SDK Build-Tools
+  - An Android Virtual Device (AVD) or physical device for testing
+</Note>
+
+## Verify Installation
+
+To verify your installation is complete, start the Metro bundler:
+
+```bash
+npm start
+```
+
+You should see the Metro bundler start successfully with output similar to:
+
+```
+Welcome to React Native!
+Learn once, write anywhere
+
+To reload the app press "r"
+To open developer menu press "d"
+```
+
+<Note>
+  Keep the Metro bundler running in this terminal. You'll need to open a new terminal window to run the app on iOS or Android.
+</Note>
+
+## Next Steps
+
+Now that you've installed all dependencies, you're ready to run the app:
+
+<Card title="Quickstart Guide" icon="rocket" href="/quickstart">
+  Learn how to run the app on iOS and Android simulators
+</Card>

@@ -1,0 +1,531 @@
+---
+title: Projects API
+description: Manage research projects and wildlife monitoring studies
+---
+
+## Overview
+
+The Projects API provides endpoints for managing research projects. Projects organize deployments, observations, and team members. All project endpoints are defined in `src/redux/api/projects/index.ts`.
+
+## Available Hooks
+
+```typescript
+import {
+  useGetProjectsQuery,
+  useGetProjectByIdQuery,
+  useCreateProjectMutation,
+  useUpdateProjectMutation,
+  useDeleteProjectMutation,
+} from '@/redux/api/projects'
+```
+
+## Project Types
+
+```typescript
+type Project = {
+  id: string
+  title: string
+  acronym: string
+  description: string
+  samplingDesign: string
+  captureMethod: string
+  individualAnimals: number
+  observationLevel: string
+  projectTeam: string
+  projectPrivacy: string
+}
+
+type ProjectCreate = Omit<Project, "id">
+type ProjectUpdate = ProjectCreate
+
+type StrapiRequest<T> = {
+  data: T
+}
+```
+
+## Get All Projects
+
+Fetch a list of all projects.
+
+### Hook
+
+```typescript
+useGetProjectsQuery()
+```
+
+### Parameters
+
+None
+
+### Response
+
+Returns an array of `Project` objects. The response is automatically unwrapped from the API's `ApiResponse<Project[]>` wrapper.
+
+<ResponseField name="Project[]" type="array">
+  Array of project objects
+  
+  <ResponseField name="id" type="string">
+    Unique project identifier
+  </ResponseField>
+  
+  <ResponseField name="title" type="string">
+    Project title
+  </ResponseField>
+  
+  <ResponseField name="acronym" type="string">
+    Project acronym or short code
+  </ResponseField>
+  
+  <ResponseField name="description" type="string">
+    Detailed project description
+  </ResponseField>
+  
+  <ResponseField name="samplingDesign" type="string">
+    Sampling methodology used in the project
+  </ResponseField>
+  
+  <ResponseField name="captureMethod" type="string">
+    Method used to capture wildlife data
+  </ResponseField>
+  
+  <ResponseField name="individualAnimals" type="number">
+    Number of individual animals being tracked
+  </ResponseField>
+  
+  <ResponseField name="observationLevel" type="string">
+    Level of observation detail
+  </ResponseField>
+  
+  <ResponseField name="projectTeam" type="string">
+    Team members or organization
+  </ResponseField>
+  
+  <ResponseField name="projectPrivacy" type="string">
+    Privacy level (e.g., "public", "private")
+  </ResponseField>
+</ResponseField>
+
+### Usage Example
+
+<CodeGroup>
+
+```typescript Component
+import { useGetProjectsQuery } from '@/redux/api/projects'
+
+function ProjectList() {
+  const { data: projects, isLoading, error } = useGetProjectsQuery()
+
+  if (isLoading) return <Loading />
+  if (error) return <Error message="Failed to load projects" />
+
+  return (
+    <div>
+      <h2>Research Projects</h2>
+      {projects?.map(project => (
+        <div key={project.id}>
+          <h3>{project.title} ({project.acronym})</h3>
+          <p>{project.description}</p>
+          <p>Team: {project.projectTeam}</p>
+          <p>Privacy: {project.projectPrivacy}</p>
+        </div>
+      ))}
+    </div>
+  )
+}
+```
+
+```typescript Response
+[
+  {
+    "id": "proj_123",
+    "title": "Amazon Jaguar Monitoring",
+    "acronym": "AJM",
+    "description": "Long-term monitoring of jaguar populations in the Amazon rainforest",
+    "samplingDesign": "Systematic grid",
+    "captureMethod": "Camera trap",
+    "individualAnimals": 45,
+    "observationLevel": "Individual",
+    "projectTeam": "Wildlife Conservation Society",
+    "projectPrivacy": "public"
+  }
+]
+```
+
+</CodeGroup>
+
+## Get Project by ID
+
+Fetch a single project by its ID.
+
+### Hook
+
+```typescript
+useGetProjectByIdQuery(id: string)
+```
+
+### Parameters
+
+<ParamField path="id" type="string" required>
+  The unique project ID
+</ParamField>
+
+### Response
+
+Returns a single `Project` object, automatically unwrapped from `ApiResponse<Project>`.
+
+### Usage Example
+
+<CodeGroup>
+
+```typescript Component
+import { useGetProjectByIdQuery } from '@/redux/api/projects'
+
+function ProjectDetail({ projectId }: { projectId: string }) {
+  const { data: project, isLoading } = useGetProjectByIdQuery(projectId)
+
+  if (isLoading) return <Loading />
+  if (!project) return <NotFound />
+
+  return (
+    <div>
+      <h1>{project.title}</h1>
+      <h2>{project.acronym}</h2>
+      <p>{project.description}</p>
+      
+      <div>
+        <h3>Project Details</h3>
+        <p>Sampling Design: {project.samplingDesign}</p>
+        <p>Capture Method: {project.captureMethod}</p>
+        <p>Individual Animals: {project.individualAnimals}</p>
+        <p>Observation Level: {project.observationLevel}</p>
+        <p>Team: {project.projectTeam}</p>
+        <p>Privacy: {project.projectPrivacy}</p>
+      </div>
+    </div>
+  )
+}
+```
+
+```typescript Response
+{
+  "id": "proj_123",
+  "title": "Amazon Jaguar Monitoring",
+  "acronym": "AJM",
+  "description": "Long-term monitoring of jaguar populations in the Amazon rainforest",
+  "samplingDesign": "Systematic grid",
+  "captureMethod": "Camera trap",
+  "individualAnimals": 45,
+  "observationLevel": "Individual",
+  "projectTeam": "Wildlife Conservation Society",
+  "projectPrivacy": "public"
+}
+```
+
+</CodeGroup>
+
+## Create Project
+
+Create a new project.
+
+### Hook
+
+```typescript
+useCreateProjectMutation()
+```
+
+### Request Parameters
+
+The request body must be wrapped in a `StrapiRequest` format:
+
+<ParamField path="data" type="ProjectCreate" required>
+  Project creation data
+  
+  <ParamField path="title" type="string" required>
+    Project title
+  </ParamField>
+  
+  <ParamField path="acronym" type="string" required>
+    Project acronym
+  </ParamField>
+  
+  <ParamField path="description" type="string" required>
+    Project description
+  </ParamField>
+  
+  <ParamField path="samplingDesign" type="string" required>
+    Sampling methodology
+  </ParamField>
+  
+  <ParamField path="captureMethod" type="string" required>
+    Data capture method
+  </ParamField>
+  
+  <ParamField path="individualAnimals" type="number" required>
+    Number of animals being tracked
+  </ParamField>
+  
+  <ParamField path="observationLevel" type="string" required>
+    Observation detail level
+  </ParamField>
+  
+  <ParamField path="projectTeam" type="string" required>
+    Team or organization name
+  </ParamField>
+  
+  <ParamField path="projectPrivacy" type="string" required>
+    Privacy setting
+  </ParamField>
+</ParamField>
+
+### Response
+
+Returns the created `Project` object with auto-generated `id`.
+
+### Usage Example
+
+<CodeGroup>
+
+```typescript Component
+import { useCreateProjectMutation } from '@/redux/api/projects'
+import { useState } from 'react'
+
+function CreateProjectForm() {
+  const [createProject, { isLoading }] = useCreateProjectMutation()
+  const [formData, setFormData] = useState({
+    title: '',
+    acronym: '',
+    description: '',
+    samplingDesign: 'Systematic grid',
+    captureMethod: 'Camera trap',
+    individualAnimals: 0,
+    observationLevel: 'Individual',
+    projectTeam: '',
+    projectPrivacy: 'private',
+  })
+
+  const handleSubmit = async (e) => {
+    e.preventDefault()
+    
+    try {
+      const project = await createProject({
+        data: formData
+      }).unwrap()
+      
+      console.log('Project created:', project.id)
+      // Navigate to project detail page
+    } catch (error) {
+      console.error('Failed to create project:', error)
+    }
+  }
+
+  return (
+    <form onSubmit={handleSubmit}>
+      <input
+        value={formData.title}
+        onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+        placeholder="Project Title"
+        required
+      />
+      <input
+        value={formData.acronym}
+        onChange={(e) => setFormData({ ...formData, acronym: e.target.value })}
+        placeholder="Acronym"
+        required
+      />
+      <textarea
+        value={formData.description}
+        onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+        placeholder="Description"
+        required
+      />
+      {/* Additional form fields */}
+      <button type="submit" disabled={isLoading}>
+        {isLoading ? 'Creating...' : 'Create Project'}
+      </button>
+    </form>
+  )
+}
+```
+
+```typescript Request
+{
+  "data": {
+    "title": "Amazon Jaguar Monitoring",
+    "acronym": "AJM",
+    "description": "Long-term monitoring of jaguar populations",
+    "samplingDesign": "Systematic grid",
+    "captureMethod": "Camera trap",
+    "individualAnimals": 45,
+    "observationLevel": "Individual",
+    "projectTeam": "Wildlife Conservation Society",
+    "projectPrivacy": "public"
+  }
+}
+```
+
+```typescript Response
+{
+  "id": "proj_123",
+  "title": "Amazon Jaguar Monitoring",
+  "acronym": "AJM",
+  "description": "Long-term monitoring of jaguar populations",
+  "samplingDesign": "Systematic grid",
+  "captureMethod": "Camera trap",
+  "individualAnimals": 45,
+  "observationLevel": "Individual",
+  "projectTeam": "Wildlife Conservation Society",
+  "projectPrivacy": "public"
+}
+```
+
+</CodeGroup>
+
+## Update Project
+
+Update an existing project.
+
+### Hook
+
+```typescript
+useUpdateProjectMutation()
+```
+
+### Request Parameters
+
+<ParamField path="id" type="string" required>
+  Project ID to update
+</ParamField>
+
+<ParamField path="body" type="ProjectUpdate" required>
+  Complete project object with updated fields
+</ParamField>
+
+### Response
+
+Returns the updated `Project` object.
+
+### Usage Example
+
+<CodeGroup>
+
+```typescript Component
+import { useUpdateProjectMutation } from '@/redux/api/projects'
+
+function EditProject({ project }: { project: Project }) {
+  const [updateProject, { isLoading }] = useUpdateProjectMutation()
+  const [description, setDescription] = useState(project.description)
+
+  const handleUpdate = async () => {
+    try {
+      const updated = await updateProject({
+        id: project.id,
+        body: {
+          ...project,
+          description,
+        },
+      }).unwrap()
+      
+      console.log('Project updated:', updated)
+    } catch (error) {
+      console.error('Failed to update project:', error)
+    }
+  }
+
+  return (
+    <div>
+      <textarea
+        value={description}
+        onChange={(e) => setDescription(e.target.value)}
+      />
+      <button onClick={handleUpdate} disabled={isLoading}>
+        {isLoading ? 'Updating...' : 'Update Project'}
+      </button>
+    </div>
+  )
+}
+```
+
+```typescript Request
+{
+  "id": "proj_123",
+  "body": {
+    "title": "Amazon Jaguar Monitoring",
+    "acronym": "AJM",
+    "description": "Updated: Long-term monitoring of jaguar populations in the Amazon rainforest",
+    "samplingDesign": "Systematic grid",
+    "captureMethod": "Camera trap",
+    "individualAnimals": 50,
+    "observationLevel": "Individual",
+    "projectTeam": "Wildlife Conservation Society",
+    "projectPrivacy": "public"
+  }
+}
+```
+
+</CodeGroup>
+
+## Delete Project
+
+Delete a project by ID.
+
+### Hook
+
+```typescript
+useDeleteProjectMutation()
+```
+
+### Parameters
+
+<ParamField path="id" type="string" required>
+  Project ID to delete
+</ParamField>
+
+### Response
+
+Returns `void` on success.
+
+### Usage Example
+
+<CodeGroup>
+
+```typescript Component
+import { useDeleteProjectMutation } from '@/redux/api/projects'
+
+function DeleteProject({ projectId }: { projectId: string }) {
+  const [deleteProject, { isLoading }] = useDeleteProjectMutation()
+
+  const handleDelete = async () => {
+    if (!confirm('Delete this project? This action cannot be undone.')) return
+    
+    try {
+      await deleteProject(projectId).unwrap()
+      console.log('Project deleted')
+      // Navigate to projects list
+    } catch (error) {
+      console.error('Failed to delete project:', error)
+    }
+  }
+
+  return (
+    <button onClick={handleDelete} disabled={isLoading}>
+      {isLoading ? 'Deleting...' : 'Delete Project'}
+    </button>
+  )
+}
+```
+
+</CodeGroup>
+
+## Response Transformation
+
+The Projects API automatically unwraps responses using `transformResponse`. Raw API responses are in the format:
+
+```typescript
+{
+  data: Project | Project[],
+  success: boolean,
+  error?: BaseResponse
+}
+```
+
+But hooks return only the `data` field for convenience.

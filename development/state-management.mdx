@@ -1,0 +1,299 @@
+---
+title: 'State Management'
+description: 'Redux Toolkit state management architecture and patterns in Wildlife Watcher'
+---
+
+## Overview
+
+Wildlife Watcher uses Redux Toolkit for state management, providing a predictable and centralized state container. The app combines local state (Redux slices) with server state (RTK Query) for optimal performance.
+
+## Store Configuration
+
+The Redux store is configured in `src/redux/index.ts`:
+
+```typescript src/redux/index.ts
+import { configureStore } from "@reduxjs/toolkit"
+import { api } from "./api"
+import devicesReducer from "./slices/devicesSlice"
+import authReducer from "./slices/authSlice"
+// ... other reducers
+
+const store = configureStore({
+  reducer: {
+    [api.reducerPath]: api.reducer,
+    devices: devicesReducer,
+    logs: logsReducer,
+    configuration: configurationReducer,
+    scanning: scanningReducer,
+    bleLibrary: bleLibraryReducer,
+    blStatus: blStatusReducer,
+    locationStatus: locationStatusReducer,
+    androidPermissions: androidPermissionsReducer,
+    authentication: authReducer,
+  },
+  middleware: (getDefaultMiddleware) =>
+    getDefaultMiddleware().concat(api.middleware),
+})
+
+export default store
+```
+
+<Note>
+RTK Query middleware is added to enable automatic refetching, caching, and cache invalidation.
+</Note>
+
+## Type-Safe Hooks
+
+The store exports typed versions of Redux hooks:
+
+```typescript src/redux/index.ts
+export type RootState = ReturnType<typeof store.getState>
+export type AppDispatch = typeof store.dispatch
+
+export const useAppDispatch = () => useDispatch<AppDispatch>()
+export const useAppSelector: TypedUseSelectorHook<RootState> = useSelector
+```
+
+### Usage Example
+
+```tsx
+import { useAppSelector, useAppDispatch } from '../redux'
+
+const MyComponent = () => {
+  const dispatch = useAppDispatch()
+  const devices = useAppSelector((state) => state.devices)
+  
+  // Type-safe access to state
+}
+```
+
+## Redux Slices
+
+### Devices Slice
+
+Manages connected Bluetooth devices and their state:
+
+```typescript src/redux/slices/devicesSlice.ts
+export interface ExtendedPeripheral extends Peripheral {
+  connected: boolean
+  signalLost?: boolean
+  device: DeviceMetadata
+  loading: boolean
+  services?: {
+    serviceCharacteristic: string
+    readCharacteristic: string
+    writeCharacteristic: string
+  }
+  intervals: {
+    [x: string]: NodeJS.Timeout | undefined | null
+  }
+}
+
+interface DevicesState {
+  [x: string]: ExtendedPeripheral
+}
+
+export const devicesSlice = createSlice({
+  name: "devices",
+  initialState: {},
+  reducers: {
+    deviceUpdate: (state, action: PayloadAction<ExtendedPeripheral>) => {
+      const { id } = action.payload
+      const currentPeripheral = state[id] || DEFAULT_PERIPHERAL(id)
+      state[id] = { ...currentPeripheral, ...action.payload }
+    },
+    deviceDisconnect: (state, action: PayloadAction<{ id: string }>) => {
+      const { id } = action.payload
+      clearAllDeviceIntervals(state[id])
+      if (state[id]) {
+        state[id].connected = false
+        state[id].signalLost = true
+      }
+    },
+    deviceLoading: (state, action: PayloadAction<{ id: string; loading: boolean }>) => {
+      const { id, loading } = action.payload
+      if (state[id]) {
+        state[id].loading = loading
+      }
+    },
+    removeDevice: (state, action: PayloadAction<{ id: string }>) => {
+      const { id } = action.payload
+      if (state[id]) {
+        clearAllDeviceIntervals(state[id])
+        delete state[id]
+      }
+    },
+  },
+})
+
+export const { deviceUpdate, deviceDisconnect, deviceLoading, removeDevice } = devicesSlice.actions
+```
+
+<Tip>
+The devices state is normalized with device IDs as keys for efficient lookups and updates.
+</Tip>
+
+### Authentication Slice
+
+Manages user authentication state and tokens:
+
+```typescript src/redux/slices/authSlice.ts
+type AuthState = {
+  token?: string
+  user?: AuthResponse["user"]
+  loading: boolean
+  initialLoad: boolean
+  error?: Error
+}
+
+export const authSlice = createSlice({
+  name: "authentication",
+  initialState: {
+    loading: false,
+    initialLoad: true,
+  },
+  reducers: {
+    setCredentials: (state, action: PayloadAction<AuthResponse>) => {
+      state.token = action.payload.jwt
+      state.user = action.payload.user
+      state.loading = false
+      state.initialLoad = false
+      storeDataToStorage(AUTH_STORAGE_KEY, action.payload)
+    },
+    logout: (state) => {
+      state.token = undefined
+      state.user = undefined
+      state.loading = false
+      state.initialLoad = false
+      storeDataToStorage(AUTH_STORAGE_KEY, null)
+    },
+    setInitialState: (state, action: PayloadAction<AuthResponse | null>) => {
+      if (action.payload) {
+        state.token = action.payload.jwt
+        state.user = action.payload.user
+      }
+      state.initialLoad = false
+    },
+  },
+})
+
+export const { setCredentials, logout, setInitialState } = authSlice.actions
+```
+
+## Available Slices
+
+The application includes the following Redux slices:
+
+<AccordionGroup>
+  <Accordion title="devices" icon="bluetooth">
+    Manages Bluetooth device connections, metadata, and intervals.
+    
+    **Key Actions:**
+    - `deviceUpdate`: Update device state
+    - `deviceDisconnect`: Handle device disconnection
+    - `deviceLoading`: Toggle loading state
+    - `removeDevice`: Remove device from state
+  </Accordion>
+
+  <Accordion title="authentication" icon="lock">
+    Handles user authentication tokens and user data.
+    
+    **Key Actions:**
+    - `setCredentials`: Store JWT and user info
+    - `logout`: Clear authentication state
+    - `setInitialState`: Restore auth from storage
+  </Accordion>
+
+  <Accordion title="bleLibrary" icon="book">
+    Tracks BLE library initialization state.
+  </Accordion>
+
+  <Accordion title="blStatus" icon="signal">
+    Monitors Bluetooth adapter status (PoweredOn, PoweredOff, etc.).
+  </Accordion>
+
+  <Accordion title="locationStatus" icon="location-dot">
+    Tracks device location permission and status.
+  </Accordion>
+
+  <Accordion title="androidPermissions" icon="shield">
+    Manages Android-specific permissions state.
+  </Accordion>
+
+  <Accordion title="configuration" icon="gear">
+    Stores device configuration settings.
+  </Accordion>
+
+  <Accordion title="scanning" icon="radar">
+    Manages BLE scanning state and discovered devices.
+  </Accordion>
+
+  <Accordion title="logs" icon="file-lines">
+    Application logging and debugging information.
+  </Accordion>
+</AccordionGroup>
+
+## Accessing State
+
+### In Components
+
+```tsx
+import { useAppSelector } from '../redux'
+
+const DeviceStatus = () => {
+  const { status, initialLoad } = useAppSelector((state) => state.blStatus)
+  const { locationEnabled } = useAppSelector((state) => state.locationStatus)
+  
+  if (initialLoad) return <Loading />
+  
+  return (
+    <View>
+      <Text>Bluetooth: {status}</Text>
+      <Text>Location: {locationEnabled ? 'Enabled' : 'Disabled'}</Text>
+    </View>
+  )
+}
+```
+
+### Dispatching Actions
+
+```tsx
+import { useAppDispatch } from '../redux'
+import { deviceUpdate } from '../redux/slices/devicesSlice'
+
+const DeviceManager = () => {
+  const dispatch = useAppDispatch()
+  
+  const updateDevice = (device: ExtendedPeripheral) => {
+    dispatch(deviceUpdate(device))
+  }
+  
+  return <DeviceList onUpdate={updateDevice} />
+}
+```
+
+## Best Practices
+
+<CardGroup cols={2}>
+  <Card title="Use Typed Hooks" icon="shield-check">
+    Always use `useAppSelector` and `useAppDispatch` instead of the default Redux hooks for type safety.
+  </Card>
+  
+  <Card title="Selector Patterns" icon="filter">
+    Create reusable selector functions for complex state derivations.
+  </Card>
+  
+  <Card title="Immutable Updates" icon="lock">
+    Redux Toolkit uses Immer internally, so you can write "mutating" logic that's actually immutable.
+  </Card>
+  
+  <Card title="Action Naming" icon="tag">
+    Use descriptive action names that indicate what happened, not what to do.
+  </Card>
+</CardGroup>
+
+## Related Resources
+
+<Card title="API Integration" icon="plug" href="./api-integration">
+  Learn how RTK Query integrates with Redux for server state management
+</Card>

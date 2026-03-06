@@ -1,0 +1,667 @@
+---
+title: 'Feedback Components'
+description: 'Components for displaying information and status to users'
+---
+
+## WWText
+
+A styled text component with theme integration and convenience props.
+
+### Props
+
+<ParamField path="children" type="React.ReactNode" required>
+  Text content to display
+</ParamField>
+
+<ParamField path="variant" type="string" default="bodyMedium">
+  Typography variant from React Native Paper theme:
+  - `displayLarge`, `displayMedium`, `displaySmall`
+  - `headlineLarge`, `headlineMedium`, `headlineSmall`
+  - `titleLarge`, `titleMedium`, `titleSmall`
+  - `bodyLarge`, `bodyMedium`, `bodySmall`
+  - `labelLarge`, `labelMedium`, `labelSmall`
+</ParamField>
+
+<ParamField path="align" type="'left' | 'center' | 'right' | 'justify'">
+  Text alignment
+</ParamField>
+
+<ParamField path="gutter" type="boolean" default="false">
+  Adds bottom margin using theme spacing
+</ParamField>
+
+<ParamField path="style" type="StyleProp<TextStyle>">
+  Custom text styles
+</ParamField>
+
+### Type Definition
+
+```tsx
+type Props = TextProps<never> & {
+  align?: TextStyle['textAlign']
+  gutter?: boolean
+}
+```
+
+### Usage Examples
+
+<Tabs>
+  <Tab title="Basic Text">
+    ```tsx
+import { WWText } from '@/components/ui'
+
+export const BasicText = () => {
+  return (
+    <>
+      <WWText variant="headlineMedium" gutter>
+        Wildlife Observation
+      </WWText>
+      <WWText>
+        Record your sightings and contribute to conservation.
+      </WWText>
+    </>
+  )
+}
+    ```
+  </Tab>
+  
+  <Tab title="Typography Scale">
+    ```tsx
+import { WWText } from '@/components/ui'
+
+export const TypographyExample = () => {
+  return (
+    <>
+      <WWText variant="displayLarge" gutter>
+        Display Large
+      </WWText>
+      <WWText variant="headlineMedium" gutter>
+        Headline Medium
+      </WWText>
+      <WWText variant="titleLarge" gutter>
+        Title Large
+      </WWText>
+      <WWText variant="bodyMedium" gutter>
+        Body Medium - Default
+      </WWText>
+      <WWText variant="labelSmall">
+        Label Small
+      </WWText>
+    </>
+  )
+}
+    ```
+  </Tab>
+  
+  <Tab title="Alignment">
+    ```tsx
+import { WWText } from '@/components/ui'
+
+export const AlignmentExample = () => {
+  return (
+    <>
+      <WWText align="left" gutter>
+        Left aligned text
+      </WWText>
+      <WWText align="center" gutter>
+        Center aligned text
+      </WWText>
+      <WWText align="right">
+        Right aligned text
+      </WWText>
+    </>
+  )
+}
+    ```
+  </Tab>
+  
+  <Tab title="Custom Styling">
+    ```tsx
+import { WWText } from '@/components/ui'
+import { StyleSheet } from 'react-native'
+
+export const CustomText = () => {
+  return (
+    <WWText style={styles.warning}>
+      This is a warning message
+    </WWText>
+  )
+}
+
+const styles = StyleSheet.create({
+  warning: {
+    color: '#ff6b6b',
+    fontWeight: '600',
+  },
+})
+    ```
+  </Tab>
+</Tabs>
+
+---
+
+## WWIcon
+
+Icon display component using Material Community Icons.
+
+### Props
+
+<ParamField path="source" type="string | React.ReactNode" required>
+  Material Community Icons icon name or custom icon component
+</ParamField>
+
+<ParamField path="size" type="number" required>
+  Size of the icon in pixels
+</ParamField>
+
+<ParamField path="color" type="string">
+  Icon color (defaults to theme color)
+</ParamField>
+
+<ParamField path="containerStyle" type="StyleProp<ViewStyle>">
+  Custom styles for the icon container
+</ParamField>
+
+<ParamField path="allowFontScaling" type="boolean">
+  Whether the icon should scale with font size settings
+</ParamField>
+
+<ParamField path="testID" type="string">
+  Test identifier for automated testing
+</ParamField>
+
+### Type Definition
+
+```tsx
+type Props = {
+  size: number
+  allowFontScaling?: boolean
+  source: any
+  color?: string | undefined
+  testID?: string | undefined
+  theme?: ThemeProp | undefined
+  containerStyle?: StyleProp<ViewStyle>
+}
+```
+
+### Usage Examples
+
+<Tabs>
+  <Tab title="Basic Icons">
+    ```tsx
+import { WWIcon } from '@/components/ui'
+
+export const BasicIcons = () => {
+  return (
+    <>
+      <WWIcon source="paw" size={24} />
+      <WWIcon source="camera" size={32} color="#4CAF50" />
+      <WWIcon source="map-marker" size={20} color="#FF5722" />
+    </>
+  )
+}
+    ```
+  </Tab>
+  
+  <Tab title="With Container">
+    ```tsx
+import { WWIcon } from '@/components/ui'
+import { StyleSheet } from 'react-native'
+
+export const IconWithContainer = () => {
+  return (
+    <WWIcon
+      source="alert-circle"
+      size={24}
+      color="white"
+      containerStyle={styles.iconContainer}
+    />
+  )
+}
+
+const styles = StyleSheet.create({
+  iconContainer: {
+    backgroundColor: '#f44336',
+    borderRadius: 20,
+    padding: 8,
+  },
+})
+    ```
+  </Tab>
+  
+  <Tab title="Icon List">
+    ```tsx
+import { WWIcon } from '@/components/ui'
+import { WWText } from '@/components/ui'
+import { View, StyleSheet } from 'react-native'
+
+const features = [
+  { icon: 'camera', label: 'Photo capture' },
+  { icon: 'map-marker', label: 'GPS location' },
+  { icon: 'weather-partly-cloudy', label: 'Weather data' },
+]
+
+export const FeatureList = () => {
+  return (
+    <View>
+      {features.map(feature => (
+        <View key={feature.icon} style={styles.item}>
+          <WWIcon source={feature.icon} size={24} />
+          <WWText>{feature.label}</WWText>
+        </View>
+      ))}
+    </View>
+  )
+}
+
+const styles = StyleSheet.create({
+  item: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    marginBottom: 12,
+  },
+})
+    ```
+  </Tab>
+</Tabs>
+
+---
+
+## WWLoader
+
+A centered loading indicator using theme colors.
+
+### Props
+
+No props - uses theme configuration automatically.
+
+### Usage Examples
+
+<Tabs>
+  <Tab title="Full Screen">
+    ```tsx
+import { WWLoader } from '@/components/ui'
+import { WWScreenView } from '@/components/ui'
+
+export const LoadingScreen = () => {
+  return (
+    <WWScreenView>
+      <WWLoader />
+    </WWScreenView>
+  )
+}
+    ```
+  </Tab>
+  
+  <Tab title="Conditional Loading">
+    ```tsx
+import { WWLoader, WWText } from '@/components/ui'
+import { WWScreenView } from '@/components/ui'
+import { useState, useEffect } from 'react'
+
+export const DataScreen = () => {
+  const [loading, setLoading] = useState(true)
+  const [data, setData] = useState(null)
+  
+  useEffect(() => {
+    fetchData().then(result => {
+      setData(result)
+      setLoading(false)
+    })
+  }, [])
+  
+  if (loading) {
+    return (
+      <WWScreenView>
+        <WWLoader />
+      </WWScreenView>
+    )
+  }
+  
+  return (
+    <WWScreenView>
+      <WWText>{data.content}</WWText>
+    </WWScreenView>
+  )
+}
+    ```
+  </Tab>
+  
+  <Tab title="Inline Loading">
+    ```tsx
+import { WWLoader } from '@/components/ui'
+import { View, StyleSheet } from 'react-native'
+
+export const InlineLoader = () => {
+  return (
+    <View style={styles.container}>
+      {/* Other content */}
+      <View style={styles.loaderSection}>
+        <WWLoader />
+      </View>
+      {/* More content */}
+    </View>
+  )
+}
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+  },
+  loaderSection: {
+    height: 200,
+  },
+})
+    ```
+  </Tab>
+</Tabs>
+
+---
+
+## WWProgressBar
+
+A progress bar with optional label display.
+
+### Props
+
+<ParamField path="progress" type="number" default="0">
+  Progress value between 0 and 1 (e.g., 0.5 for 50%)
+</ParamField>
+
+<ParamField path="showLabel" type="boolean" default="false">
+  Whether to display the progress label
+</ParamField>
+
+<ParamField path="label" type="string">
+  Custom label text (defaults to "Progress: X%")
+</ParamField>
+
+<ParamField path="color" type="string">
+  Progress bar color (defaults to theme primary color)
+</ParamField>
+
+<ParamField path="style" type="StyleProp<ViewStyle>">
+  Custom styles for the progress bar
+</ParamField>
+
+### Type Definition
+
+```tsx
+type Props = ProgressBarProps & {
+  showLabel?: boolean
+  label?: string
+}
+```
+
+### Usage Examples
+
+<Tabs>
+  <Tab title="Basic Progress">
+    ```tsx
+import { WWProgressBar } from '@/components/ui'
+import { useState, useEffect } from 'react'
+
+export const UploadProgress = () => {
+  const [progress, setProgress] = useState(0)
+  
+  // Simulate upload progress
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setProgress(prev => Math.min(prev + 0.1, 1))
+    }, 500)
+    return () => clearInterval(timer)
+  }, [])
+  
+  return (
+    <WWProgressBar 
+      progress={progress} 
+      showLabel
+    />
+  )
+}
+    ```
+  </Tab>
+  
+  <Tab title="Custom Label">
+    ```tsx
+import { WWProgressBar } from '@/components/ui'
+import { useState } from 'react'
+
+export const CustomLabelProgress = () => {
+  const [progress, setProgress] = useState(0.7)
+  const uploaded = Math.round(progress * 100)
+  
+  return (
+    <WWProgressBar
+      progress={progress}
+      showLabel
+      label={`Uploading: ${uploaded} of 100 photos`}
+    />
+  )
+}
+    ```
+  </Tab>
+  
+  <Tab title="Multiple Progress Bars">
+    ```tsx
+import { WWProgressBar } from '@/components/ui'
+import { WWText } from '@/components/ui'
+import { View, StyleSheet } from 'react-native'
+
+export const MultiProgressExample = () => {
+  return (
+    <View style={styles.container}>
+      <WWText variant="titleSmall">Upload Status</WWText>
+      
+      <View style={styles.section}>
+        <WWText variant="bodySmall">Photos</WWText>
+        <WWProgressBar progress={0.8} />
+      </View>
+      
+      <View style={styles.section}>
+        <WWText variant="bodySmall">Location Data</WWText>
+        <WWProgressBar progress={0.6} />
+      </View>
+      
+      <View style={styles.section}>
+        <WWText variant="bodySmall">Notes</WWText>
+        <WWProgressBar progress={1.0} />
+      </View>
+    </View>
+  )
+}
+
+const styles = StyleSheet.create({
+  container: {
+    padding: 16,
+    gap: 12,
+  },
+  section: {
+    gap: 4,
+  },
+})
+    ```
+  </Tab>
+  
+  <Tab title="With Ref">
+    ```tsx
+import { WWProgressBar } from '@/components/ui'
+import { useRef } from 'react'
+import { View } from 'react-native'
+
+export const ProgressWithRef = () => {
+  const progressRef = useRef<View>(null)
+  
+  return (
+    <WWProgressBar
+      ref={progressRef}
+      progress={0.5}
+      showLabel
+    />
+  )
+}
+    ```
+  </Tab>
+</Tabs>
+
+---
+
+## WWAvatar
+
+User avatar image component with optional press handling.
+
+### Props
+
+<ParamField path="size" type="number" default="40">
+  Size of the avatar in pixels
+</ParamField>
+
+<ParamField path="onPress" type="() => void">
+  Callback function when avatar is pressed (makes it touchable)
+</ParamField>
+
+<ParamField path="style" type="StyleProp<ViewStyle>">
+  Custom styles for the avatar
+</ParamField>
+
+### Type Definition
+
+```tsx
+type Props = {
+  size?: number
+  style?: StyleProp<ViewStyle>
+  onPress?: () => void
+}
+```
+
+### Usage Examples
+
+<Tabs>
+  <Tab title="Basic Avatar">
+    ```tsx
+import { WWAvatar } from '@/components/ui'
+
+export const UserProfile = () => {
+  return <WWAvatar size={60} />
+}
+    ```
+  </Tab>
+  
+  <Tab title="Interactive Avatar">
+    ```tsx
+import { WWAvatar } from '@/components/ui'
+import { useNavigation } from '@react-navigation/native'
+
+export const HeaderAvatar = () => {
+  const navigation = useNavigation()
+  
+  const handlePress = () => {
+    navigation.navigate('Profile')
+  }
+  
+  return (
+    <WWAvatar 
+      size={40} 
+      onPress={handlePress}
+    />
+  )
+}
+    ```
+  </Tab>
+  
+  <Tab title="Avatar Sizes">
+    ```tsx
+import { WWAvatar } from '@/components/ui'
+import { View, StyleSheet } from 'react-native'
+
+export const AvatarSizes = () => {
+  return (
+    <View style={styles.container}>
+      <WWAvatar size={24} />
+      <WWAvatar size={40} />
+      <WWAvatar size={60} />
+      <WWAvatar size={80} />
+    </View>
+  )
+}
+
+const styles = StyleSheet.create({
+  container: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 16,
+  },
+})
+    ```
+  </Tab>
+  
+  <Tab title="In Header">
+    ```tsx
+import { WWAvatar } from '@/components/ui'
+import { WWText } from '@/components/ui'
+import { View, StyleSheet } from 'react-native'
+
+export const ScreenHeader = () => {
+  return (
+    <View style={styles.header}>
+      <WWText variant="headlineMedium">
+        My Observations
+      </WWText>
+      <WWAvatar 
+        size={40} 
+        onPress={() => console.log('Profile pressed')}
+      />
+    </View>
+  )
+}
+
+const styles = StyleSheet.create({
+  header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 16,
+  },
+})
+    ```
+  </Tab>
+</Tabs>
+
+## Implementation Details
+
+### Source Code Locations
+
+- **WWText**: `/workspace/source/src/components/ui/WWText.tsx:11-33`
+- **WWIcon**: `/workspace/source/src/components/ui/WWIcon.tsx:26-32`
+- **WWLoader**: `/workspace/source/src/components/ui/WWLoader.tsx:5-13`
+- **WWProgressBar**: `/workspace/source/src/components/ui/WWProgressBar.tsx:12-33`
+- **WWAvatar**: `/workspace/source/src/components/ui/WWAvatar.tsx:15-29`
+
+### Theme Integration
+
+#### WWText
+- Uses `useExtendedTheme` to access `spacing` for gutter margins
+- Inherits all typography variants from React Native Paper theme
+
+#### WWLoader
+- Uses theme `colors.primary` for the loading indicator color
+- Centered with `flex: 1`, `justifyContent: 'center'`, `alignItems: 'center'`
+
+#### WWProgressBar
+- Uses theme `colors.primary` as default progress color
+- Fixed height of 6px with 3px border radius
+- Percentage calculated automatically: `Math.round(progress * 100)`
+
+#### WWAvatar
+- Displays static avatar image from `../../assets/avatar.png`
+- Applies 6px end margin for spacing in layouts
+- Conditionally wraps in `TouchableOpacity` when `onPress` is provided
+
+### Accessibility
+
+- **WWText**: Inherits all accessibility props from React Native Paper's Text
+- **WWIcon**: Supports `testID` for automated testing
+- **WWLoader**: ActivityIndicator has built-in accessibility announcements
+- **WWProgressBar**: Progress percentage announced automatically
+- **WWAvatar**: Touchable when `onPress` is provided for better UX

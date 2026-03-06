@@ -1,0 +1,277 @@
+---
+title: 'Button Components'
+description: 'Interactive button components for user actions'
+---
+
+## WWButton
+
+The primary button component with built-in error state handling. Based on React Native Paper's Button component.
+
+### Props
+
+<ParamField path="hasError" type="boolean" default="false">
+  When true, applies error styling (red border) to the button
+</ParamField>
+
+<ParamField path="errorText" type="string">
+  Error message displayed below the button when `hasError` is true
+</ParamField>
+
+<ParamField path="mode" type="'text' | 'outlined' | 'contained' | 'elevated' | 'contained-tonal'">
+  Button visual style from React Native Paper
+</ParamField>
+
+<ParamField path="onPress" type="() => void">
+  Callback function triggered when the button is pressed
+</ParamField>
+
+<ParamField path="disabled" type="boolean" default="false">
+  Disables the button and prevents user interaction
+</ParamField>
+
+<ParamField path="icon" type="string | React.ReactNode">
+  Icon to display in the button (Material Community Icons name or custom component)
+</ParamField>
+
+<ParamField path="loading" type="boolean" default="false">
+  Shows a loading spinner inside the button
+</ParamField>
+
+<ParamField path="children" type="React.ReactNode">
+  Button label text or content
+</ParamField>
+
+<ParamField path="style" type="StyleProp<ViewStyle>">
+  Custom styles for the button
+</ParamField>
+
+### Type Definition
+
+```tsx
+export type WWButtonProps = CommonProps & ButtonProps
+
+type CommonProps = {
+  hasError?: boolean
+  errorText?: string
+}
+```
+
+### Usage Examples
+
+<Tabs>
+  <Tab title="Basic Button">
+    ```tsx
+import { WWButton } from '@/components/ui'
+
+export const BasicExample = () => {
+  return (
+    <WWButton 
+      mode="contained" 
+      onPress={() => console.log('Pressed')}
+    >
+      Save Observation
+    </WWButton>
+  )
+}
+    ```
+  </Tab>
+  
+  <Tab title="With Icon">
+    ```tsx
+import { WWButton } from '@/components/ui'
+
+export const IconExample = () => {
+  return (
+    <WWButton 
+      mode="contained"
+      icon="camera"
+      onPress={() => console.log('Take photo')}
+    >
+      Take Photo
+    </WWButton>
+  )
+}
+    ```
+  </Tab>
+  
+  <Tab title="Error State">
+    ```tsx
+import { WWButton } from '@/components/ui'
+import { useState } from 'react'
+
+export const ErrorExample = () => {
+  const [hasError, setHasError] = useState(false)
+  
+  const handleSubmit = () => {
+    // Validation logic
+    if (!isValid) {
+      setHasError(true)
+    }
+  }
+  
+  return (
+    <WWButton 
+      mode="contained"
+      onPress={handleSubmit}
+      hasError={hasError}
+      errorText="Please fill in all required fields"
+    >
+      Submit
+    </WWButton>
+  )
+}
+    ```
+  </Tab>
+  
+  <Tab title="Loading State">
+    ```tsx
+import { WWButton } from '@/components/ui'
+import { useState } from 'react'
+
+export const LoadingExample = () => {
+  const [loading, setLoading] = useState(false)
+  
+  const handleUpload = async () => {
+    setLoading(true)
+    await uploadData()
+    setLoading(false)
+  }
+  
+  return (
+    <WWButton 
+      mode="contained"
+      loading={loading}
+      disabled={loading}
+      onPress={handleUpload}
+    >
+      Upload
+    </WWButton>
+  )
+}
+    ```
+  </Tab>
+</Tabs>
+
+---
+
+## WWIconButton
+
+A compact icon-only button for toolbar actions and compact UI elements.
+
+### Props
+
+<ParamField path="icon" type="string" required>
+  Material Community Icons icon name
+</ParamField>
+
+<ParamField path="onPress" type="() => void">
+  Callback function triggered when the button is pressed
+</ParamField>
+
+<ParamField path="disabled" type="boolean" default="false">
+  Disables the button and prevents user interaction
+</ParamField>
+
+<ParamField path="size" type="number" default="24">
+  Size of the icon in pixels
+</ParamField>
+
+<ParamField path="iconColor" type="string">
+  Custom color for the icon
+</ParamField>
+
+<ParamField path="style" type="StyleProp<ViewStyle>">
+  Custom styles for the button container
+</ParamField>
+
+### Type Definition
+
+```tsx
+export type WWIconButtonProps = CommonProps & IconButtonProps
+
+type CommonProps = {
+  hasError?: boolean
+  errorText?: string
+}
+```
+
+### Usage Examples
+
+<Tabs>
+  <Tab title="Basic Icon Button">
+    ```tsx
+import { WWIconButton } from '@/components/ui'
+
+export const IconButtonExample = () => {
+  return (
+    <WWIconButton 
+      icon="magnify" 
+      onPress={() => console.log('Search')}
+    />
+  )
+}
+    ```
+  </Tab>
+  
+  <Tab title="Toolbar Actions">
+    ```tsx
+import { WWIconButton } from '@/components/ui'
+import { View, StyleSheet } from 'react-native'
+
+export const ToolbarExample = () => {
+  return (
+    <View style={styles.toolbar}>
+      <WWIconButton icon="menu" onPress={() => {}} />
+      <WWIconButton icon="magnify" onPress={() => {}} />
+      <WWIconButton icon="filter" onPress={() => {}} />
+    </View>
+  )
+}
+
+const styles = StyleSheet.create({
+  toolbar: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+})
+    ```
+  </Tab>
+  
+  <Tab title="Custom Size & Color">
+    ```tsx
+import { WWIconButton } from '@/components/ui'
+
+export const CustomIconButton = () => {
+  return (
+    <WWIconButton 
+      icon="heart" 
+      size={32}
+      iconColor="red"
+      onPress={() => console.log('Favorite')}
+    />
+  )
+}
+    ```
+  </Tab>
+</Tabs>
+
+## Implementation Details
+
+### Source Code Location
+
+- Component: `/workspace/source/src/components/ui/WWButton.tsx`
+- Lines: 19-44
+
+### Error Styling
+
+When `hasError` is true, buttons receive:
+- Red border (1px width)
+- Error text displayed below in red color (12px font size)
+- 4px top margin for error text
+
+### Accessibility
+
+Both button components:
+- Support ref forwarding
+- Inherit accessibility props from React Native Paper
+- Provide visual feedback for disabled states

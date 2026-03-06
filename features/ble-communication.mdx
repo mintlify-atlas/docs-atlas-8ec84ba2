@@ -1,0 +1,410 @@
+---
+title: BLE Communication
+description: Learn how the Wildlife Watcher app communicates with devices via Bluetooth Low Energy (BLE)
+---
+
+## Overview
+
+The Wildlife Watcher mobile app uses Bluetooth Low Energy (BLE) to communicate with field devices. The BLE system provides a robust, queue-based command engine that handles device scanning, connection, and data exchange.
+
+## Architecture
+
+The BLE communication layer consists of:
+
+- **Command Queue Engine**: Manages sequential command execution with proper delays
+- **Command Parser**: Constructs and parses BLE commands
+- **Connection Manager**: Handles device connections, reconnections, and disconnections
+- **Notification System**: Receives real-time data from devices
+
+## Core Commands
+
+All BLE commands are defined in `src/ble/types.ts`. Here are the available commands:
+
+### Device Information Commands
+
+<CodeGroup>
+
+```typescript Device ID
+CommandNames.ID
+// Command: "id"
+// Returns: Device identifier
+```
+
+```typescript Version
+CommandNames.VERSION
+// Command: "ver"
+// Returns: Firmware version
+```
+
+```typescript Battery Level
+CommandNames.BATTERY
+// Command: "battery"
+// Returns: Battery percentage (e.g., "Battery = 85%")
+// Regex: /\bBattery\s=\s(100|\d{1,3})%/
+```
+
+```typescript Device Info
+CommandNames.DEVICE
+// Command: "device"
+// Returns: Complete device information
+```
+
+</CodeGroup>
+
+### Configuration Commands
+
+<CodeGroup>
+
+```typescript Heartbeat Interval
+CommandNames.HEARTBEAT
+// Read: "get heartbeat"
+// Write: "heartbeat <value>" (e.g., "heartbeat 10m")
+// Regex: /\bheartbeat\s+is\s+(\d+d|\d+h|\d+m|\d+s)\b/
+```
+
+```typescript LoRaWAN DevEUI
+CommandNames.DEVEUI
+// Read: "get deveui"
+// Write: "deveui <value>"
+// Regex: /\DevEui:\s([a-zA-Z0-9:]+)\b/
+```
+
+```typescript LoRaWAN AppEUI
+CommandNames.APPEUI
+// Read: "get appeui"
+// Write: "appeui <value>"
+// Regex: /\bAppEui:\s([a-zA-Z0-9:]+)\b/
+```
+
+```typescript LoRaWAN AppKey
+CommandNames.APPKEY
+// Read: "get appkey"
+// Write: "appkey <value>"
+// Regex: /\bAppKey:\s([a-zA-Z0-9:]+)\b/
+```
+
+</CodeGroup>
+
+### Device Status Commands
+
+<CodeGroup>
+
+```typescript Sensor Status
+CommandNames.SENSOR
+// Read: "status"
+// Write: "enable" or "disable"
+// Regex: /Trap: (\w+). Sensor: (enabled|disabled). LoRaWan: ((?:\w+\s*)+)./
+```
+
+```typescript Trap Status
+CommandNames.TRAP
+// Read: "status"
+// Returns: Current trap state
+```
+
+```typescript LoRaWAN Status
+CommandNames.LORAWAN
+// Read: "status"
+// Returns: LoRaWAN connection status
+```
+
+</CodeGroup>
+
+### Action Commands
+
+<CodeGroup>
+
+```typescript Ping Device
+CommandNames.PING
+// Command: "ping"
+// Used for keep-alive checks
+```
+
+```typescript Reset Device
+CommandNames.RESET
+// Command: "reset"
+// Response: "Device will reset after disconnecting."
+```
+
+```typescript Erase NVM
+CommandNames.ERASE
+// Command: "erase"
+// Response: "NVM will be erased after disconnecting."
+```
+
+```typescript Enter DFU Mode
+CommandNames.DFU
+// Command: "dfu"
+// Response: "Device will enter DFU mode after disconnecting."
+```
+
+```typescript Disconnect
+CommandNames.DISCONNECT
+// Command: "dis"
+// Gracefully disconnects from device
+```
+
+</CodeGroup>
+
+## Using the BLE Hook
+
+The `useBle` hook provides the main interface for BLE operations:
+
+```typescript src/hooks/useBle.ts
+import { useBle } from '../hooks/useBle';
+import { CommandNames, CommandControlTypes } from '../ble/types';
+
+const MyComponent = () => {
+  const { 
+    startScan, 
+    connectDevice, 
+    disconnectDevice, 
+    write,
+    isBleConnecting 
+  } = useBle();
+
+  // Start scanning for devices
+  const handleScan = () => {
+    startScan(6); // Scan for 6 seconds
+  };
+
+  // Connect to a device
+  const handleConnect = async (device: ExtendedPeripheral) => {
+    const connected = await connectDevice(device);
+    if (connected.connected) {
+      console.log('Device connected!');
+    }
+  };
+
+  // Read battery level
+  const readBattery = async (device: ExtendedPeripheral) => {
+    await write(device, [
+      [CommandNames.BATTERY, { control: CommandControlTypes.READ }]
+    ]);
+  };
+
+  // Write heartbeat interval
+  const setHeartbeat = async (device: ExtendedPeripheral) => {
+    await write(device, [
+      [CommandNames.HEARTBEAT, { 
+        control: CommandControlTypes.WRITE,
+        value: '10m' // 10 minutes
+      }]
+    ]);
+  };
+};
+```
+
+## Command Queue Engine
+
+The BLE engine uses a queue system to prevent overwhelming the device buffer:
+
+<Steps>
+
+<Step title="Command Queuing">
+Commands are added to `bleWriteFunctionsToCall` array and executed sequentially.
+</Step>
+
+<Step title="Sequential Execution">
+The engine processes one command at a time with a 500ms delay between commands (defined by `PAUSE` constant).
+</Step>
+
+<Step title="Engine Control">
+The engine can be paused/resumed using `enginePause()` and `pingsPause()` methods:
+
+```typescript
+const { enginePause, pingsPause } = useBle();
+
+// Pause all BLE operations
+enginePause(true);
+
+// Pause only ping requests (keep-alive)
+pingsPause(true);
+
+// Resume operations
+enginePause(false);
+```
+</Step>
+
+<Step title="Keep-Alive Pings">
+Connected devices receive automatic battery check pings every 40 seconds to maintain the connection.
+</Step>
+
+</Steps>
+
+<Note>
+The command queue automatically filters out ping requests when the engine is busy with other operations to prioritize user commands.
+</Note>
+
+## Using the Command Hook
+
+For individual command management, use the `useCommand` hook:
+
+```typescript src/components/DeviceConfig.tsx
+import { useCommand } from '../hooks/useCommand';
+import { COMMANDS } from '../ble/types';
+
+const DeviceConfig = ({ deviceId }: { deviceId: string }) => {
+  const { set, get, commandLoading } = useCommand({
+    deviceId,
+    command: COMMANDS.HEARTBEAT
+  });
+
+  const updateHeartbeat = () => {
+    set('15m'); // Set to 15 minutes
+  };
+
+  const refreshValue = () => {
+    get(); // Read current value
+  };
+
+  return (
+    <View>
+      {commandLoading ? (
+        <Text>Loading...</Text>
+      ) : (
+        <Button onPress={updateHeartbeat}>Set Heartbeat</Button>
+      )}
+    </View>
+  );
+};
+```
+
+### Command Hook Features
+
+- **Automatic retries**: Commands retry every 7 seconds if no response
+- **Timeout handling**: Commands timeout after 10 seconds
+- **State management**: Tracks loading state and configuration values
+- **Auto-fetch**: Automatically fetches values on mount
+
+## Connection Flow
+
+<Steps>
+
+<Step title="Start Scan">
+Initiate BLE scanning for devices:
+
+```typescript
+await BleManager.scan([], scanDuration);
+```
+</Step>
+
+<Step title="Device Discovery">
+Devices are discovered and added to Redux state. Filter for Wildlife Watcher devices using the service UUID.
+</Step>
+
+<Step title="Connect to Device">
+Connect to a discovered device:
+
+```typescript
+await BleManager.connect(deviceId);
+const services = await BleManager.retrieveServices(deviceId);
+```
+</Step>
+
+<Step title="Start Notifications">
+Enable notifications to receive data from the device:
+
+```typescript
+await BleManager.startNotification(
+  deviceId,
+  serviceCharacteristic,
+  readCharacteristic
+);
+```
+</Step>
+
+<Step title="Initial Ping">
+Send initial battery check to verify connection:
+
+```typescript
+await write(device, [
+  [CommandNames.BATTERY, { control: CommandControlTypes.READ }]
+]);
+```
+</Step>
+
+<Step title="Keep-Alive">
+Set up 40-second interval for automatic ping requests to maintain connection.
+</Step>
+
+</Steps>
+
+## Error Handling
+
+```typescript
+try {
+  await connectDevice(peripheral);
+} catch (error) {
+  console.error('Connection failed:', error);
+  await disconnectDevice(peripheral);
+}
+```
+
+<Note type="warning">
+Always disconnect devices properly to clean up intervals and prevent memory leaks. The app automatically disconnects leftover devices on initialization.
+</Note>
+
+## Command Construction
+
+Commands are constructed using the parser:
+
+```typescript src/ble/parser.ts
+import { constructCommandString, CommandControlTypes } from '../ble/parser';
+
+// Read command
+const readCmd = constructCommandString(
+  CommandNames.BATTERY,
+  { control: CommandControlTypes.READ }
+);
+// Returns: "battery"
+
+// Write command
+const writeCmd = constructCommandString(
+  CommandNames.HEARTBEAT,
+  { control: CommandControlTypes.WRITE, value: '5m' }
+);
+// Returns: "heartbeat 5m"
+```
+
+## Response Parsing
+
+The parser extracts values from device responses using regular expressions:
+
+```typescript
+import { parseLogs } from '../ble/parser';
+
+const finishedLog = "battery\nBattery = 85%\n";
+const results = parseLogs(finishedLog, "\n");
+
+// results:
+// [{
+//   value: "85",
+//   command: COMMANDS.BATTERY
+// }]
+```
+
+## Best Practices
+
+<Card title="Performance" icon="gauge-high">
+- Pause pinging during critical operations using `pingsPause(true)`
+- Batch multiple commands in a single `write()` call
+- Use timeouts for long-running operations
+</Card>
+
+<Card title="Reliability" icon="shield-check">
+- Always handle connection failures gracefully
+- Implement reconnection logic for dropped connections
+- Clean up intervals when disconnecting devices
+</Card>
+
+<Card title="Battery Optimization" icon="battery-three-quarters">
+- Minimize ping frequency when connection is stable
+- Stop scanning when not needed
+- Disconnect devices when not in use
+</Card>
+
+## Related
+
+- [Device Management](/features/device-management) - Managing connected devices
+- [Firmware Updates](/features/firmware-updates) - Updating device firmware via DFU

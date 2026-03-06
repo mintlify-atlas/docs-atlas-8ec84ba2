@@ -1,0 +1,466 @@
+---
+title: 'Navigation'
+description: 'React Navigation setup and routing patterns in Wildlife Watcher'
+---
+
+## Overview
+
+Wildlife Watcher uses React Navigation v6 for navigation, combining stack navigation, bottom tabs, and drawer navigation to create an intuitive user experience.
+
+## Navigation Architecture
+
+The app uses a nested navigation structure:
+
+```
+NavigationContainer
+└── AppDrawer (Side Drawer)
+    └── Stack Navigator
+        ├── Loading Screens (conditional)
+        ├── Error Screens (conditional)
+        └── Main App
+            ├── Home (Bottom Tabs)
+            │   ├── Maps
+            │   ├── Projects
+            │   ├── Deployments
+            │   └── Devices
+            └── Modal Screens
+                ├── Notifications
+                ├── Profile
+                ├── Settings
+                ├── AddDeployment
+                └── AddProject
+```
+
+## Stack Navigator
+
+The main stack navigator is configured in `src/navigation/index.tsx`:
+
+```typescript src/navigation/index.tsx
+import { createNativeStackNavigator } from '@react-navigation/native-stack'
+
+export interface RootStackParamList extends ParamListBase {
+  CommunityDiscussion: undefined
+  Notifications: undefined
+  Profile: undefined
+  Settings: undefined
+  Home: undefined
+  DeviceNavigator: { deviceId: string }
+  Terminal: { deviceId: string }
+  DfuScreen: { deviceId: string }
+  Login: undefined
+  Register: undefined
+  AddDeployment: { selectedProject?: Option } | undefined
+  AddProject: undefined
+}
+
+export const Stack = createNativeStackNavigator<RootStackParamList>()
+```
+
+<Tip>
+All navigation routes are typed through `RootStackParamList` for type-safe navigation throughout the app.
+</Tip>
+
+## Main Navigation Component
+
+The `MainNavigation` component handles conditional rendering based on app state:
+
+```tsx src/navigation/index.tsx
+export const MainNavigation = () => {
+  const { status, initialLoad: blLoading } = useAppSelector(
+    (state) => state.blStatus,
+  )
+  const { locationEnabled, initialLoad: locLoading } = useAppSelector(
+    (state) => state.locationStatus,
+  )
+  const { initialized, initialLoad: bleLoading } = useAppSelector(
+    (state) => state.bleLibrary,
+  )
+
+  const appLoading = blLoading || locLoading || bleLoading
+
+  useEffect(() => {
+    if (!appLoading) {
+      BootSplash.hide({ fade: true })
+    }
+  }, [appLoading])
+
+  if (appLoading) {
+    return (
+      <Stack.Navigator initialRouteName="AppLoading">
+        <Stack.Screen
+          name="AppLoading"
+          component={AppLoading}
+          options={{ headerShown: false }}
+        />
+      </Stack.Navigator>
+    )
+  }
+
+  return (
+    <AppDrawer>
+      <Stack.Navigator
+        initialRouteName="Home"
+        screenOptions={{
+          header: NavigationBar,
+        }}
+      >
+        {!['PoweredOn', 'Unsupported'].includes(status) ? (
+          <Stack.Screen
+            name="BluetoothProblems"
+            component={BluetoothProblems}
+            options={{ headerShown: false }}
+          />
+        ) : !locationEnabled ? (
+          <Stack.Screen
+            options={{ headerShown: false }}
+            name="LocationProblems"
+            component={LocationProblems}
+          />
+        ) : !initialized ? (
+          <Stack.Screen
+            options={{ headerShown: false }}
+            name="BLEProblems"
+            component={BleProblems}
+          />
+        ) : (
+          <Stack.Group>
+            <Stack.Screen
+              name="Home"
+              component={BottomTabs}
+              options={{ title: "Wildlife Watcher" }}
+            />
+            {/* ... other screens */}
+          </Stack.Group>
+        )}
+      </Stack.Navigator>
+    </AppDrawer>
+  )
+}
+```
+
+<Note>
+The navigation structure changes dynamically based on Bluetooth status, location permissions, and BLE initialization state.
+</Note>
+
+## Bottom Tab Navigation
+
+The home screen uses bottom tabs configured in `src/navigation/BottomTabs.tsx`:
+
+```tsx src/navigation/BottomTabs.tsx
+import { BottomNavigation } from 'react-native-paper'
+
+export const BottomTabs = () => {
+  const [index, setIndex] = useState(2) // Start with Deployment tab
+  const { colors } = useExtendedTheme()
+
+  const routes = [
+    {
+      key: 'maps',
+      title: 'Maps',
+      focusedIcon: 'map',
+      unfocusedIcon: 'map-outline',
+    },
+    {
+      key: 'projects',
+      title: 'Projects',
+      focusedIcon: 'folder',
+      unfocusedIcon: 'folder-outline',
+    },
+    {
+      key: 'deployment',
+      title: 'Deployment',
+      focusedIcon: 'upload',
+      unfocusedIcon: 'upload-outline',
+    },
+    {
+      key: 'devices',
+      title: 'Devices',
+      focusedIcon: 'devices',
+      unfocusedIcon: 'devices',
+    },
+  ]
+
+  const renderScene = BottomNavigation.SceneMap({
+    maps: Maps,
+    projects: Projects,
+    deployment: Deployments,
+    devices: Devices,
+  })
+
+  return (
+    <BottomNavigation
+      navigationState={{ index, routes }}
+      onIndexChange={setIndex}
+      renderScene={renderScene}
+      activeColor={colors.primary}
+      barStyle={{ backgroundColor: colors.background }}
+    />
+  )
+}
+```
+
+## Navigation Patterns
+
+### Type-Safe Navigation
+
+Use typed navigation hooks for type safety:
+
+```tsx
+import { NativeStackNavigationProp } from '@react-navigation/native-stack'
+import { RootStackParamList } from '../navigation'
+
+type NavigationProp = NativeStackNavigationProp<RootStackParamList>
+
+const MyScreen = () => {
+  const navigation = useNavigation<NavigationProp>()
+  
+  const goToProfile = () => {
+    navigation.navigate('Profile')
+  }
+  
+  const goToDevice = (deviceId: string) => {
+    navigation.navigate('DeviceNavigator', { deviceId })
+  }
+  
+  return (
+    <View>
+      <WWButton onPress={goToProfile}>View Profile</WWButton>
+    </View>
+  )
+}
+```
+
+### Accessing Route Parameters
+
+```tsx
+import { RouteProp, useRoute } from '@react-navigation/native'
+import { RootStackParamList } from '../navigation'
+
+type RouteProps = RouteProp<RootStackParamList, 'DeviceNavigator'>
+
+const DeviceScreen = () => {
+  const route = useRoute<RouteProps>()
+  const { deviceId } = route.params
+  
+  return (
+    <WWScreenView>
+      <WWText>Device ID: {deviceId}</WWText>
+    </WWScreenView>
+  )
+}
+```
+
+### Custom Navigation Hook
+
+The app provides a custom hook for common navigation patterns:
+
+```tsx
+import { useAppNavigation } from '../hooks/useAppNavigation'
+
+const MyComponent = () => {
+  const navigation = useAppNavigation()
+  
+  // Type-safe navigation with autocomplete
+  navigation.navigate('AddDeployment', { selectedProject })
+}
+```
+
+## Drawer Navigation
+
+The app drawer is implemented in `src/components/AppDrawer.tsx` and provides:
+
+- Quick access to profile
+- Settings navigation
+- Community features
+- Notifications
+
+## Nested Navigation
+
+The device configuration screen uses nested navigation:
+
+```tsx src/navigation/index.tsx
+export const DeviceNavigation = () => {
+  const {
+    params: { deviceId },
+  } = useRoute<AppParams<"DeviceNavigator">>()
+
+  return (
+    <DeviceReconnectProvider deviceId={deviceId}>
+      <Stack.Navigator screenOptions={{ headerShown: false }}>
+        <Stack.Screen
+          name="Terminal"
+          component={Terminal}
+          initialParams={{ deviceId }}
+        />
+      </Stack.Navigator>
+    </DeviceReconnectProvider>
+  )
+}
+```
+
+<Note>
+The nested navigator is wrapped in a provider that manages device connection state specific to that device.
+</Note>
+
+## Screen Options
+
+### Global Screen Options
+
+```tsx
+<Stack.Navigator
+  screenOptions={{
+    header: NavigationBar, // Custom header component
+  }}
+>
+```
+
+### Per-Screen Options
+
+```tsx
+<Stack.Screen
+  name="Profile"
+  component={Profile}
+  options={{
+    title: "Profile",
+    headerShown: true,
+  }}
+/>
+
+<Stack.Screen
+  name="BluetoothProblems"
+  component={BluetoothProblems}
+  options={{ headerShown: false }}
+/>
+```
+
+## Conditional Screens
+
+The app shows different screens based on state:
+
+```tsx
+{!['PoweredOn', 'Unsupported'].includes(status) ? (
+  <Stack.Screen
+    name="BluetoothProblems"
+    component={BluetoothProblems}
+  />
+) : !locationEnabled ? (
+  <Stack.Screen
+    name="LocationProblems"
+    component={LocationProblems}
+  />
+) : !initialized ? (
+  <Stack.Screen
+    name="BLEProblems"
+    component={BleProblems}
+  />
+) : (
+  <Stack.Group>
+    {/* Main app screens */}
+  </Stack.Group>
+)}
+```
+
+<Tip>
+This pattern ensures users complete required setup (Bluetooth, location) before accessing the main app.
+</Tip>
+
+## Navigation Guards
+
+Authentication guards can be implemented (currently commented out):
+
+```tsx
+// Example authentication guard
+{!token ? (
+  <Stack.Group screenOptions={{ headerShown: false }}>
+    <Stack.Screen name="Login" component={Login} />
+    <Stack.Screen name="Register" component={Register} />
+  </Stack.Group>
+) : (
+  <Stack.Group>
+    {/* Authenticated screens */}
+  </Stack.Group>
+)}
+```
+
+## Deep Linking
+
+Configure deep linking in the NavigationContainer:
+
+```tsx
+const linking = {
+  prefixes: ['wildlifewatcher://', 'https://app.wildlifewatcher.com'],
+  config: {
+    screens: {
+      Home: 'home',
+      Profile: 'profile',
+      DeviceNavigator: 'device/:deviceId',
+      AddDeployment: 'deployment/new',
+    },
+  },
+}
+
+<NavigationContainer linking={linking}>
+  {/* ... */}
+</NavigationContainer>
+```
+
+## Best Practices
+
+<CardGroup cols={2}>
+  <Card title="Type Safety" icon="shield-check">
+    Always define route params in `RootStackParamList` for type-safe navigation.
+  </Card>
+  
+  <Card title="Lazy Loading" icon="clock">
+    Consider lazy loading screens that aren't part of the initial user flow.
+  </Card>
+  
+  <Card title="Navigation State" icon="database">
+    Avoid storing navigation state in Redux - use navigation state directly.
+  </Card>
+  
+  <Card title="Back Button" icon="arrow-left">
+    Handle Android back button behavior for better UX.
+  </Card>
+</CardGroup>
+
+## Common Navigation Tasks
+
+### Navigate with Parameters
+
+```tsx
+navigation.navigate('AddDeployment', { selectedProject: project })
+```
+
+### Go Back
+
+```tsx
+navigation.goBack()
+```
+
+### Reset Navigation Stack
+
+```tsx
+navigation.reset({
+  index: 0,
+  routes: [{ name: 'Home' }],
+})
+```
+
+### Navigate and Replace
+
+```tsx
+navigation.replace('Home')
+```
+
+## Related Resources
+
+<CardGroup cols={2}>
+  <Card title="Project Structure" icon="folder-tree" href="./project-structure">
+    Learn about the overall codebase organization
+  </Card>
+  
+  <Card title="State Management" icon="store" href="./state-management">
+    Understand Redux integration with navigation
+  </Card>
+</CardGroup>

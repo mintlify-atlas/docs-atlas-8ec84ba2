@@ -1,0 +1,428 @@
+---
+title: Authentication
+description: Implement user authentication with JWT tokens and OAuth 2.0 in Wildlife Watcher
+icon: lock
+---
+
+The Wildlife Watcher mobile app uses JWT-based authentication for API access and includes support for OAuth 2.0 via `react-native-app-auth`.
+
+## Authentication Architecture
+
+The app implements authentication using:
+
+- **JWT tokens** for API authentication
+- **Redux Toolkit** for state management
+- **AsyncStorage** for persistent storage
+- **react-native-app-auth** (v8.0.0) for OAuth support
+
+## JWT Authentication
+
+### Authentication Flow
+
+<Steps>
+  <Step title="User Login">
+    User submits credentials to the login endpoint:
+
+    ```typescript
+    import { useLoginMutation } from '../redux/api/auth';
+
+    const [login, { isLoading }] = useLoginMutation();
+
+    const handleLogin = async () => {
+      try {
+        const result = await login({
+          identifier: email,
+          password: password,
+        }).unwrap();
+        
+        // Authentication successful
+        // Token and user data are automatically stored
+      } catch (error) {
+        console.error('Login failed:', error);
+      }
+    };
+    ```
+  </Step>
+
+  <Step title="Store Authentication Data">
+    On successful login, the app stores the JWT token and user data:
+
+    ```typescript
+    // From src/redux/slices/authSlice.ts
+    setCredentials: (state, action: PayloadAction<AuthResponse>) => {
+      state.token = action.payload.jwt;
+      state.user = action.payload.user;
+      state.loading = false;
+      state.initialLoad = false;
+      
+      // Persist to AsyncStorage
+      storeDataToStorage(AUTH_STORAGE_KEY, action.payload);
+    }
+    ```
+  </Step>
+
+  <Step title="Automatic Token Injection">
+    The token is automatically injected into all API requests:
+
+    ```typescript
+    prepareHeaders: (headers, { getState }) => {
+      const token = (getState() as RootState).authentication.token;
+      
+      if (token) {
+        headers.set('Authorization', `Bearer ${token}`);
+      }
+      
+      return headers;
+    }
+    ```
+  </Step>
+</Steps>
+
+### API Endpoints
+
+The authentication API is configured in `src/redux/api/auth/index.ts`:
+
+```typescript
+export const authApi = api.injectEndpoints({
+  endpoints: (builder) => ({
+    login: builder.mutation<AuthResponse, LoginRequest>({
+      query: (credentials) => ({
+        url: API_URLS.AUTH_LOGIN,  // POST /api/auth/local
+        method: 'POST',
+        body: credentials,
+      }),
+    }),
+    register: builder.mutation<AuthResponse, RegisterRequest>({
+      query: (credentials) => ({
+        url: API_URLS.AUTH_REGISTER,  // POST /api/auth/local/register
+        method: 'POST',
+        body: credentials,
+      }),
+    }),
+  }),
+});
+```
+
+### Authentication Types
+
+```typescript
+type LoginRequest = {
+  identifier: string;  // Email or username
+  password: string;
+};
+
+type RegisterRequest = {
+  username: string;
+  email: string;
+  password: string;
+};
+
+type AuthResponse = {
+  jwt: string;
+  user: {
+    id: string;
+    username: string;
+    email: string;
+    // ... other user fields
+  };
+};
+```
+
+## OAuth 2.0 Setup
+
+The app includes `react-native-app-auth` v8.0.0 for OAuth 2.0 authentication.
+
+### Installation
+
+The package is already included in `package.json`:
+
+```json
+{
+  "dependencies": {
+    "react-native-app-auth": "^8.0.0"
+  }
+}
+```
+
+### iOS Configuration
+
+<Steps>
+  <Step title="Configure URL Scheme">
+    Add your OAuth redirect URL scheme to `ios/WildlifeWatcher/Info.plist`:
+
+    ```xml
+    <key>CFBundleURLTypes</key>
+    <array>
+      <dict>
+        <key>CFBundleURLName</key>
+        <string>com.wildlife.watcher</string>
+        <key>CFBundleURLSchemes</key>
+        <array>
+          <string>com.wildlife.auth</string>
+        </array>
+      </dict>
+    </array>
+    ```
+
+    <Note>
+      The redirect URL will be: `com.wildlife.auth://oauth2redirect`
+    </Note>
+  </Step>
+
+  <Step title="Install iOS Dependencies">
+    ```bash
+    cd ios
+    bundle exec pod install
+    cd ..
+    ```
+  </Step>
+</Steps>
+
+### Android Configuration
+
+<Steps>
+  <Step title="Configure Redirect URL">
+    Add the OAuth redirect intent filter to `android/app/src/main/AndroidManifest.xml`:
+
+    ```xml
+    <activity
+      android:name=".MainActivity"
+      android:launchMode="singleTask">
+      
+      <intent-filter>
+        <action android:name="android.intent.action.MAIN" />
+        <category android:name="android.intent.category.LAUNCHER" />
+      </intent-filter>
+      
+      <!-- Add OAuth redirect -->
+      <intent-filter>
+        <action android:name="android.intent.action.VIEW" />
+        <category android:name="android.intent.category.DEFAULT" />
+        <category android:name="android.intent.category.BROWSABLE" />
+        <data
+          android:scheme="com.wildlife.auth"
+          android:host="oauth2redirect" />
+      </intent-filter>
+      
+    </activity>
+    ```
+  </Step>
+</Steps>
+
+### OAuth Implementation Example
+
+```typescript
+import { authorize } from 'react-native-app-auth';
+
+const config = {
+  issuer: 'https://accounts.google.com',
+  clientId: 'YOUR_CLIENT_ID',
+  redirectUrl: 'com.wildlife.auth://oauth2redirect',
+  scopes: ['openid', 'profile', 'email'],
+};
+
+const handleOAuthLogin = async () => {
+  try {
+    const result = await authorize(config);
+    
+    // result contains:
+    // - accessToken
+    // - refreshToken
+    // - idToken
+    // - tokenType
+    
+    console.log('OAuth success:', result);
+    
+    // Send token to your backend for verification
+    // and exchange for JWT
+    
+  } catch (error) {
+    console.error('OAuth failed:', error);
+  }
+};
+```
+
+### Supported OAuth Providers
+
+You can integrate with any OAuth 2.0 / OpenID Connect provider:
+
+<CardGroup cols={2}>
+  <Card title="Google" icon="google">
+    ```typescript
+    {
+      issuer: 'https://accounts.google.com',
+      clientId: 'YOUR_GOOGLE_CLIENT_ID',
+    }
+    ```
+  </Card>
+  
+  <Card title="Auth0" icon="lock">
+    ```typescript
+    {
+      issuer: 'https://YOUR_DOMAIN.auth0.com',
+      clientId: 'YOUR_AUTH0_CLIENT_ID',
+    }
+    ```
+  </Card>
+  
+  <Card title="Okta" icon="shield">
+    ```typescript
+    {
+      issuer: 'https://YOUR_DOMAIN.okta.com',
+      clientId: 'YOUR_OKTA_CLIENT_ID',
+    }
+    ```
+  </Card>
+  
+  <Card title="Custom" icon="code">
+    ```typescript
+    {
+      issuer: 'https://your-auth-server.com',
+      clientId: 'YOUR_CLIENT_ID',
+    }
+    ```
+  </Card>
+</CardGroup>
+
+## Auth Provider
+
+The `AuthProvider` component initializes authentication state on app startup:
+
+```typescript
+import { AuthProvider } from './providers/AuthProvider';
+
+export const AuthProvider = ({ children }: PropsWithChildren) => {
+  const dispatch = useAppDispatch();
+  
+  useEffect(() => {
+    const init = async () => {
+      // Load stored auth data from AsyncStorage
+      const authData = await getStorageData<AuthResponse>(AUTH_STORAGE_KEY);
+      dispatch(setInitialState(authData));
+    };
+    
+    init();
+  }, [dispatch]);
+  
+  return children;
+};
+```
+
+### Usage in App
+
+```typescript
+import { AuthProvider } from './providers/AuthProvider';
+
+function App() {
+  return (
+    <Provider store={store}>
+      <AuthProvider>
+        {/* Rest of your app */}
+      </AuthProvider>
+    </Provider>
+  );
+}
+```
+
+## Logout
+
+To log out a user and clear authentication data:
+
+```typescript
+import { useAppDispatch } from '../redux';
+import { logout } from '../redux/slices/authSlice';
+
+const dispatch = useAppDispatch();
+
+const handleLogout = () => {
+  // Clears token, user data, and AsyncStorage
+  dispatch(logout());
+};
+```
+
+## Authentication State
+
+Access authentication state throughout your app:
+
+```typescript
+import { useAppSelector } from '../redux';
+
+function MyComponent() {
+  const { token, user, loading, initialLoad } = useAppSelector(
+    (state) => state.authentication
+  );
+  
+  if (initialLoad) {
+    return <LoadingScreen />;
+  }
+  
+  if (!token) {
+    return <LoginScreen />;
+  }
+  
+  return <MainApp user={user} />;
+}
+```
+
+## Security Best Practices
+
+<Warning>
+  **Important Security Considerations**
+</Warning>
+
+1. **Store Tokens Securely**: Consider using [react-native-keychain](https://github.com/oblador/react-native-keychain) for more secure token storage instead of AsyncStorage.
+
+2. **Token Expiration**: Implement token refresh logic to handle expired JWTs:
+
+   ```typescript
+   const refreshToken = async () => {
+     const refreshToken = await getStorageData('refreshToken');
+     const response = await fetch(`${API_BASE}/api/auth/refresh`, {
+       method: 'POST',
+       headers: { 'Content-Type': 'application/json' },
+       body: JSON.stringify({ refreshToken }),
+     });
+     const data = await response.json();
+     dispatch(setCredentials(data));
+   };
+   ```
+
+3. **HTTPS Only**: Never send credentials or tokens over HTTP. Always use HTTPS in production.
+
+4. **Biometric Authentication**: Consider adding biometric authentication for enhanced security:
+
+   ```bash
+   npm install react-native-biometrics
+   ```
+
+## Testing Authentication
+
+Test your authentication flow:
+
+```typescript
+import { render, fireEvent, waitFor } from '@testing-library/react-native';
+import LoginScreen from '../screens/LoginScreen';
+
+test('successful login', async () => {
+  const { getByPlaceholderText, getByText } = render(<LoginScreen />);
+  
+  fireEvent.changeText(getByPlaceholderText('Email'), 'user@example.com');
+  fireEvent.changeText(getByPlaceholderText('Password'), 'password123');
+  fireEvent.press(getByText('Login'));
+  
+  await waitFor(() => {
+    expect(mockNavigation.navigate).toHaveBeenCalledWith('Home');
+  });
+});
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Configuration" icon="gear" href="/guides/configuration">
+    Configure API endpoints and environment variables
+  </Card>
+  <Card title="Permissions" icon="shield-check" href="/guides/permissions">
+    Set up BLE and location permissions
+  </Card>
+</CardGroup>

@@ -1,0 +1,545 @@
+---
+title: Deployments API
+description: Track camera trap deployments in the field
+---
+
+## Overview
+
+The Deployments API manages camera trap deployments at specific locations. Deployments link devices to projects and track location data, timing, and environmental conditions. All deployment endpoints are defined in `src/redux/api/deployments/index.ts`.
+
+## Available Hooks
+
+```typescript
+import {
+  useGetDeploymentsQuery,
+  useGetDeploymentByIdQuery,
+  useCreateDeploymentMutation,
+  useUpdateDeploymentMutation,
+  useDeleteDeploymentMutation,
+} from '@/redux/api/deployments'
+```
+
+## Deployment Types
+
+```typescript
+type Deployment = {
+  id: string
+  deploymentID: string
+  locationID?: string
+  locationName?: string
+  projectID?: string
+  latitude?: number
+  longitude?: number
+  coordinateUncertainty?: number
+  deploymentStart?: string
+  deploymentEnd?: string
+  setupBy?: string
+  deviceID?: string
+  deviceDelay?: number
+  deviceHeight?: number
+  deviceTilt?: number
+  deviceHeading?: number
+  detectionDistance?: number
+  baitUse?: string
+  habitat?: string
+  deploymentComments?: string
+  deploymentPhotos?: string[]
+  mediaID?: string
+  observations?: string[]
+}
+
+type DeploymentCreate = Omit<Deployment, "id">
+type DeploymentUpdate = DeploymentCreate
+```
+
+## Get All Deployments
+
+Fetch a list of all deployments.
+
+### Hook
+
+```typescript
+useGetDeploymentsQuery()
+```
+
+### Parameters
+
+None
+
+### Response
+
+Returns an array of `Deployment` objects, automatically unwrapped from `ApiResponse<Deployment[]>`.
+
+<ResponseField name="Deployment[]" type="array">
+  Array of deployment objects with location and device configuration data
+  
+  <ResponseField name="id" type="string">
+    Internal unique identifier
+  </ResponseField>
+  
+  <ResponseField name="deploymentID" type="string">
+    Deployment identifier
+  </ResponseField>
+  
+  <ResponseField name="locationID" type="string" optional>
+    Location identifier
+  </ResponseField>
+  
+  <ResponseField name="locationName" type="string" optional>
+    Human-readable location name
+  </ResponseField>
+  
+  <ResponseField name="projectID" type="string" optional>
+    Associated project ID
+  </ResponseField>
+  
+  <ResponseField name="latitude" type="number" optional>
+    GPS latitude coordinate
+  </ResponseField>
+  
+  <ResponseField name="longitude" type="number" optional>
+    GPS longitude coordinate
+  </ResponseField>
+  
+  <ResponseField name="deploymentStart" type="string" optional>
+    Deployment start timestamp (ISO 8601)
+  </ResponseField>
+  
+  <ResponseField name="deploymentEnd" type="string" optional>
+    Deployment end timestamp (ISO 8601)
+  </ResponseField>
+  
+  <ResponseField name="deviceID" type="string" optional>
+    Associated device ID
+  </ResponseField>
+  
+  <ResponseField name="habitat" type="string" optional>
+    Habitat type description
+  </ResponseField>
+</ResponseField>
+
+### Usage Example
+
+<CodeGroup>
+
+```typescript Component
+import { useGetDeploymentsQuery } from '@/redux/api/deployments'
+import { MapView, Marker } from 'react-native-maps'
+
+function DeploymentMap() {
+  const { data: deployments, isLoading } = useGetDeploymentsQuery()
+
+  if (isLoading) return <Loading />
+
+  return (
+    <MapView
+      initialRegion={{
+        latitude: -3.4653,
+        longitude: -62.2159,
+        latitudeDelta: 10,
+        longitudeDelta: 10,
+      }}
+    >
+      {deployments?.map(deployment => (
+        deployment.latitude && deployment.longitude && (
+          <Marker
+            key={deployment.id}
+            coordinate={{
+              latitude: deployment.latitude,
+              longitude: deployment.longitude,
+            }}
+            title={deployment.locationName}
+            description={deployment.deploymentComments}
+          />
+        )
+      ))}
+    </MapView>
+  )
+}
+```
+
+```typescript Response
+[
+  {
+    "id": "dep_456",
+    "deploymentID": "DEP-001",
+    "locationID": "loc_789",
+    "locationName": "Amazon Site A",
+    "projectID": "proj_123",
+    "latitude": -3.4653,
+    "longitude": -62.2159,
+    "coordinateUncertainty": 10,
+    "deploymentStart": "2024-01-15T08:00:00Z",
+    "deploymentEnd": "2024-06-15T08:00:00Z",
+    "setupBy": "Dr. Jane Smith",
+    "deviceID": "dev_123",
+    "deviceHeight": 50,
+    "deviceTilt": 0,
+    "deviceHeading": 180,
+    "habitat": "Tropical rainforest",
+    "deploymentComments": "Near water source",
+    "observations": ["obs_001", "obs_002"]
+  }
+]
+```
+
+</CodeGroup>
+
+## Get Deployment by ID
+
+Fetch a single deployment by its ID.
+
+### Hook
+
+```typescript
+useGetDeploymentByIdQuery(id: string)
+```
+
+### Parameters
+
+<ParamField path="id" type="string" required>
+  The unique deployment ID
+</ParamField>
+
+### Response
+
+Returns a single `Deployment` object.
+
+### Usage Example
+
+<CodeGroup>
+
+```typescript Component
+import { useGetDeploymentByIdQuery } from '@/redux/api/deployments'
+
+function DeploymentDetail({ deploymentId }: { deploymentId: string }) {
+  const { data: deployment, isLoading } = useGetDeploymentByIdQuery(deploymentId)
+
+  if (isLoading) return <Loading />
+  if (!deployment) return <NotFound />
+
+  return (
+    <div>
+      <h1>{deployment.locationName}</h1>
+      <p>ID: {deployment.deploymentID}</p>
+      
+      {deployment.latitude && deployment.longitude && (
+        <div>
+          <h3>Location</h3>
+          <p>Latitude: {deployment.latitude}</p>
+          <p>Longitude: {deployment.longitude}</p>
+          <p>Habitat: {deployment.habitat}</p>
+        </div>
+      )}
+      
+      <div>
+        <h3>Timing</h3>
+        <p>Start: {new Date(deployment.deploymentStart).toLocaleDateString()}</p>
+        {deployment.deploymentEnd && (
+          <p>End: {new Date(deployment.deploymentEnd).toLocaleDateString()}</p>
+        )}
+      </div>
+      
+      {deployment.deploymentComments && (
+        <div>
+          <h3>Notes</h3>
+          <p>{deployment.deploymentComments}</p>
+        </div>
+      )}
+    </div>
+  )
+}
+```
+
+</CodeGroup>
+
+## Create Deployment
+
+Create a new deployment.
+
+### Hook
+
+```typescript
+useCreateDeploymentMutation()
+```
+
+### Request Parameters
+
+The request body must be wrapped in a `StrapiRequest` format:
+
+<ParamField path="data" type="DeploymentCreate" required>
+  Deployment creation data
+  
+  <ParamField path="deploymentID" type="string" required>
+    Deployment identifier
+  </ParamField>
+  
+  <ParamField path="locationName" type="string" optional>
+    Location name
+  </ParamField>
+  
+  <ParamField path="projectID" type="string" optional>
+    Associated project ID
+  </ParamField>
+  
+  <ParamField path="latitude" type="number" optional>
+    GPS latitude
+  </ParamField>
+  
+  <ParamField path="longitude" type="number" optional>
+    GPS longitude
+  </ParamField>
+  
+  <ParamField path="deploymentStart" type="string" optional>
+    Start timestamp (ISO 8601)
+  </ParamField>
+  
+  <ParamField path="deviceID" type="string" optional>
+    Associated device ID
+  </ParamField>
+  
+  <ParamField path="habitat" type="string" optional>
+    Habitat type
+  </ParamField>
+</ParamField>
+
+### Response
+
+Returns the created `Deployment` object with auto-generated `id`.
+
+### Usage Example
+
+<CodeGroup>
+
+```typescript Component
+import { useCreateDeploymentMutation } from '@/redux/api/deployments'
+import { useState } from 'react'
+
+function CreateDeploymentForm({ projectId, deviceId }) {
+  const [createDeployment, { isLoading }] = useCreateDeploymentMutation()
+  const [location, setLocation] = useState({ latitude: null, longitude: null })
+  const [locationName, setLocationName] = useState('')
+
+  const handleSubmit = async (e) => {
+    e.preventDefault()
+    
+    try {
+      const deployment = await createDeployment({
+        data: {
+          deploymentID: `DEP-${Date.now()}`,
+          locationName,
+          projectID: projectId,
+          deviceID: deviceId,
+          latitude: location.latitude,
+          longitude: location.longitude,
+          deploymentStart: new Date().toISOString(),
+          habitat: 'Tropical rainforest',
+        }
+      }).unwrap()
+      
+      console.log('Deployment created:', deployment.id)
+    } catch (error) {
+      console.error('Failed to create deployment:', error)
+    }
+  }
+
+  return (
+    <form onSubmit={handleSubmit}>
+      <input
+        value={locationName}
+        onChange={(e) => setLocationName(e.target.value)}
+        placeholder="Location Name"
+        required
+      />
+      {/* GPS picker component */}
+      <button type="submit" disabled={isLoading}>
+        {isLoading ? 'Creating...' : 'Create Deployment'}
+      </button>
+    </form>
+  )
+}
+```
+
+```typescript Request
+{
+  "data": {
+    "deploymentID": "DEP-001",
+    "locationName": "Amazon Site A",
+    "projectID": "proj_123",
+    "deviceID": "dev_123",
+    "latitude": -3.4653,
+    "longitude": -62.2159,
+    "deploymentStart": "2024-01-15T08:00:00Z",
+    "habitat": "Tropical rainforest"
+  }
+}
+```
+
+```typescript Response
+{
+  "id": "dep_456",
+  "deploymentID": "DEP-001",
+  "locationName": "Amazon Site A",
+  "projectID": "proj_123",
+  "latitude": -3.4653,
+  "longitude": -62.2159,
+  "deploymentStart": "2024-01-15T08:00:00Z",
+  "deviceID": "dev_123",
+  "habitat": "Tropical rainforest"
+}
+```
+
+</CodeGroup>
+
+## Update Deployment
+
+Update an existing deployment.
+
+### Hook
+
+```typescript
+useUpdateDeploymentMutation()
+```
+
+### Request Parameters
+
+<ParamField path="id" type="string" required>
+  Deployment ID to update
+</ParamField>
+
+<ParamField path="body" type="DeploymentUpdate" required>
+  Complete deployment object with updated fields
+</ParamField>
+
+### Response
+
+Returns the updated `Deployment` object.
+
+### Usage Example
+
+<CodeGroup>
+
+```typescript Component
+import { useUpdateDeploymentMutation } from '@/redux/api/deployments'
+
+function EndDeployment({ deployment }: { deployment: Deployment }) {
+  const [updateDeployment, { isLoading }] = useUpdateDeploymentMutation()
+
+  const handleEnd = async () => {
+    try {
+      const updated = await updateDeployment({
+        id: deployment.id,
+        body: {
+          ...deployment,
+          deploymentEnd: new Date().toISOString(),
+        },
+      }).unwrap()
+      
+      console.log('Deployment ended:', updated)
+    } catch (error) {
+      console.error('Failed to end deployment:', error)
+    }
+  }
+
+  return (
+    <button onClick={handleEnd} disabled={isLoading}>
+      {isLoading ? 'Ending...' : 'End Deployment'}
+    </button>
+  )
+}
+```
+
+</CodeGroup>
+
+## Delete Deployment
+
+Delete a deployment by ID.
+
+### Hook
+
+```typescript
+useDeleteDeploymentMutation()
+```
+
+### Parameters
+
+<ParamField path="id" type="string" required>
+  Deployment ID to delete
+</ParamField>
+
+### Response
+
+Returns `void` on success.
+
+### Usage Example
+
+<CodeGroup>
+
+```typescript Component
+import { useDeleteDeploymentMutation } from '@/redux/api/deployments'
+
+function DeleteDeployment({ deploymentId }: { deploymentId: string }) {
+  const [deleteDeployment, { isLoading }] = useDeleteDeploymentMutation()
+
+  const handleDelete = async () => {
+    if (!confirm('Delete this deployment?')) return
+    
+    try {
+      await deleteDeployment(deploymentId).unwrap()
+      console.log('Deployment deleted')
+    } catch (error) {
+      console.error('Failed to delete deployment:', error)
+    }
+  }
+
+  return (
+    <button onClick={handleDelete} disabled={isLoading}>
+      {isLoading ? 'Deleting...' : 'Delete'}
+    </button>
+  )
+}
+```
+
+</CodeGroup>
+
+## Working with Location Data
+
+### GPS Coordinates
+
+Deployments store GPS coordinates for mapping:
+
+```typescript
+const { data: deployments } = useGetDeploymentsQuery()
+
+// Filter deployments with valid coordinates
+const mappableDeployments = deployments?.filter(
+  d => d.latitude && d.longitude
+)
+
+// Calculate bounding box
+const bounds = mappableDeployments?.reduce(
+  (acc, d) => ({
+    minLat: Math.min(acc.minLat, d.latitude),
+    maxLat: Math.max(acc.maxLat, d.latitude),
+    minLng: Math.min(acc.minLng, d.longitude),
+    maxLng: Math.max(acc.maxLng, d.longitude),
+  }),
+  { minLat: Infinity, maxLat: -Infinity, minLng: Infinity, maxLng: -Infinity }
+)
+```
+
+### Active Deployments
+
+Filter by deployment status:
+
+```typescript
+const { data: deployments } = useGetDeploymentsQuery()
+
+const activeDeployments = deployments?.filter(
+  d => d.deploymentStart && !d.deploymentEnd
+)
+
+const completedDeployments = deployments?.filter(
+  d => d.deploymentStart && d.deploymentEnd
+)
+```

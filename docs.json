@@ -1,122 +1,120 @@
 {
   "$schema": "https://mintlify.com/docs.json",
-  "theme": "mint",
-  "name": "Mint Starter Kit",
+  "name": "Wildlife Watcher Mobile App",
+  "theme": "almond",
   "colors": {
-    "primary": "#16A34A",
-    "light": "#07C983",
-    "dark": "#15803D"
+    "primary": "#fc0404",
+    "light": "#fc7c7c",
+    "dark": "#fc0404"
   },
-  "favicon": "/favicon.svg",
+  "favicon": "https://media.brand.dev/b59c5e8b-9bf1-4e64-93e2-f33d66921643.png",
+  "logo": {
+    "light": "/logo.png",
+    "dark": "/logo.png"
+  },
+  "navbar": {
+    "primary": {
+      "type": "github",
+      "href": "https://github.com/wildlifeai/wildlife-watcher-mobile-app"
+    }
+  },
+  "footer": {
+    "socials": {
+      "github": "https://github.com/wildlifeai/wildlife-watcher-mobile-app"
+    }
+  },
   "navigation": {
     "tabs": [
       {
-        "tab": "Guides",
+        "tab": "Documentation",
         "groups": [
           {
-            "group": "Getting started",
+            "group": "Get Started",
             "pages": [
-              "index",
-              "quickstart",
-              "development"
+              "introduction",
+              "installation",
+              "quickstart"
             ]
           },
           {
-            "group": "Customization",
+            "group": "Core Features",
             "pages": [
-              "essentials/settings",
-              "essentials/navigation"
+              "features/ble-communication",
+              "features/device-management",
+              "features/projects-deployments",
+              "features/maps-observations",
+              "features/firmware-updates"
             ]
           },
           {
-            "group": "Writing content",
+            "group": "Development",
             "pages": [
-              "essentials/markdown",
-              "essentials/code",
-              "essentials/images",
-              "essentials/reusable-snippets"
+              "development/project-structure",
+              "development/state-management",
+              "development/api-integration",
+              "development/navigation"
             ]
           },
           {
-            "group": "AI tools",
+            "group": "Guides",
             "pages": [
-              "ai-tools/cursor",
-              "ai-tools/claude-code",
-              "ai-tools/windsurf"
+              "guides/configuration",
+              "guides/authentication",
+              "guides/permissions",
+              "guides/troubleshooting"
             ]
           }
         ]
       },
       {
-        "tab": "API reference",
+        "tab": "Components",
         "groups": [
           {
-            "group": "API documentation",
+            "group": "UI Components",
             "pages": [
-              "api-reference/introduction"
+              "components/overview",
+              "components/buttons",
+              "components/inputs",
+              "components/layout",
+              "components/feedback"
             ]
           },
           {
-            "group": "Endpoint examples",
+            "group": "BLE Components",
             "pages": [
-              "api-reference/endpoint/get",
-              "api-reference/endpoint/create",
-              "api-reference/endpoint/delete",
-              "api-reference/endpoint/webhook"
+              "components/ble/commands",
+              "components/ble/hooks",
+              "components/ble/providers"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "API Reference",
+        "groups": [
+          {
+            "group": "Redux API",
+            "pages": [
+              "api/overview",
+              "api/auth",
+              "api/devices",
+              "api/projects",
+              "api/deployments",
+              "api/observations",
+              "api/media"
+            ]
+          },
+          {
+            "group": "Hooks",
+            "pages": [
+              "api/hooks/use-ble",
+              "api/hooks/use-command",
+              "api/hooks/use-permissions",
+              "api/hooks/use-navigation"
             ]
           }
         ]
       }
-    ],
-    "global": {
-      "anchors": [
-        {
-          "anchor": "Documentation",
-          "href": "https://mintlify.com/docs",
-          "icon": "book-open-cover"
-        },
-        {
-          "anchor": "Blog",
-          "href": "https://mintlify.com/blog",
-          "icon": "newspaper"
-        }
-      ]
-    }
-  },
-  "logo": {
-    "light": "/logo/light.svg",
-    "dark": "/logo/dark.svg"
-  },
-  "navbar": {
-    "links": [
-      {
-        "label": "Support",
-        "href": "mailto:hi@mintlify.com"
-      }
-    ],
-    "primary": {
-      "type": "button",
-      "label": "Dashboard",
-      "href": "https://dashboard.mintlify.com"
-    }
-  },
-  "contextual": {
-    "options": [
-     "copy",
-     "view",
-     "chatgpt",
-     "claude",
-     "perplexity",
-     "mcp",
-     "cursor",
-     "vscode"
-   ]
-  },
-  "footer": {
-    "socials": {
-      "x": "https://x.com/mintlify",
-      "github": "https://github.com/mintlify",
-      "linkedin": "https://linkedin.com/company/mintlify"
-    }
+    ]
   }
 }

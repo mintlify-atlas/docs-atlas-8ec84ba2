@@ -1,80 +1,218 @@
 ---
 title: "Quickstart"
-description: "Start building awesome documentation in minutes"
+description: "Get the Wildlife Watcher mobile app running in minutes"
 ---
 
-## Get started in three steps
+This guide will help you get the Wildlife Watcher mobile app up and running on your development machine.
 
-Get your documentation site running locally and make your first customization.
+## Prerequisites
 
-### Step 1: Set up your local environment
+Before you begin, ensure you have:
 
-<AccordionGroup>
-  <Accordion icon="copy" title="Clone your docs locally">
-    During the onboarding process, you created a GitHub repository with your docs content if you didn't already have one. You can find a link to this repository in your [dashboard](https://dashboard.mintlify.com).
-    
-    To clone the repository locally so that you can make and preview changes to your docs, follow the [Cloning a repository](https://docs.github.com/en/repositories/creating-and-managing-repositories/cloning-a-repository) guide in the GitHub docs.
-  </Accordion>
-  <Accordion icon="rectangle-terminal" title="Start the preview server">
-    1. Install the Mintlify CLI: `npm i -g mint`
-    2. Navigate to your docs directory and run: `mint dev`
-    3. Open `http://localhost:3000` to see your docs live!
-    
-    <Tip>Your preview updates automatically as you edit files.</Tip>
-  </Accordion>
-</AccordionGroup>
-
-### Step 2: Deploy your changes
-
-<AccordionGroup>
-  <Accordion icon="github" title="Install our GitHub app">
-    Install the Mintlify GitHub app from your [dashboard](https://dashboard.mintlify.com/settings/organization/github-app).
-    
-    Our GitHub app automatically deploys your changes to your docs site, so you don't need to manage deployments yourself.
-</Accordion>
-<Accordion icon="palette" title="Update your site name and colors">
-    For a first change, let's update the name and colors of your docs site.
-
-    1. Open `docs.json` in your editor.
-    2. Change the `"name"` field to your project name.
-    3. Update the `"colors"` to match your brand.
-    4. Save and see your changes instantly at `http://localhost:3000`.
-
-    <Tip>Try changing the primary color to see an immediate difference!</Tip>
-  </Accordion>
-</AccordionGroup>
-
-### Step 3: Go live
-
-<Accordion icon="rocket" title="Publish your docs">
-  1. Commit and push your changes.
-  2. Your docs will update and be live in moments!
-</Accordion>
-
-## Next steps
-
-Now that you have your docs running, explore these key features:
-
-<CardGroup cols={2}>
-
-<Card title="Write Content" icon="pen-to-square" href="/essentials/markdown">
-  Learn MDX syntax and start writing your documentation.
-</Card>
-
-<Card title="Customize style" icon="palette" href="/essentials/settings">
-  Make your docs match your brand perfectly.
-</Card>
-
-<Card title="Add code examples" icon="square-code" href="/essentials/code">
-  Include syntax-highlighted code blocks.
-</Card>
-
-<Card title="API documentation" icon="code" href="/api-reference/introduction">
-  Auto-generate API docs from OpenAPI specs.
-</Card>
-
-</CardGroup>
+- **Node.js 18+** installed on your machine
+- **Ruby 2.6.10+** for iOS development
+- **React Native environment** set up per the [official documentation](https://reactnative.dev/docs/set-up-your-environment)
+- **Xcode** (for iOS development) or **Android Studio** (for Android development)
 
 <Note>
-  **Need help?** See our [full documentation](https://mintlify.com/docs) or join our [community](https://mintlify.com/community).
+  If you haven't set up your React Native development environment yet, follow the [installation guide](/installation) first.
 </Note>
+
+## Running on iOS
+
+<Steps>
+  <Step title="Start Metro Bundler">
+    Open a terminal in the project directory and start Metro:
+    ```bash
+    npm start
+    ```
+    Metro is the JavaScript bundler for React Native. Keep this terminal window open.
+  </Step>
+
+  <Step title="Run on iOS Simulator">
+    In a new terminal window, run:
+    ```bash
+    npm run ios
+    ```
+    
+    This will build the iOS app and launch it in the iOS Simulator. The first build may take several minutes.
+    
+    To run on a specific simulator:
+    ```bash
+    npx react-native run-ios --simulator="iPhone 15 Pro"
+    ```
+  </Step>
+
+  <Step title="Verify the App">
+    Once the app launches, you should see the Wildlife Watcher login screen. The app is now running in development mode.
+  </Step>
+</Steps>
+
+## Running on Android
+
+<Steps>
+  <Step title="Start an Android Emulator">
+    Launch an Android emulator from Android Studio, or connect a physical Android device via USB with USB debugging enabled.
+  </Step>
+
+  <Step title="Start Metro Bundler">
+    In a terminal, start Metro:
+    ```bash
+    npm start
+    ```
+  </Step>
+
+  <Step title="Run on Android">
+    In a new terminal window, run:
+    ```bash
+    npm run android
+    ```
+    
+    This will build the Android app and install it on your emulator or connected device.
+  </Step>
+</Steps>
+
+## Testing on Physical Devices
+
+### iOS Device
+
+1. Connect your iOS device via USB
+2. Open the project in Xcode: `ios/WildlifeWatcher.xcworkspace`
+3. Select your device from the device dropdown
+4. Click the "Run" button or press `Cmd + R`
+
+<Warning>
+  You'll need to configure code signing in Xcode with your Apple Developer account.
+</Warning>
+
+### Android Device
+
+1. Enable **Developer Options** and **USB Debugging** on your Android device
+2. Connect your device via USB
+3. Run `adb devices` to verify the device is connected
+4. Run `npm run android`
+
+## Understanding the App Structure
+
+Once the app is running, you'll see:
+
+### Main Navigation
+
+The app uses a bottom tab navigator with four main sections:
+
+```typescript src/navigation/BottomTabs.tsx
+<Tab.Screen
+  name="Devices"
+  component={Devices}
+  options={{
+    tabBarIcon: ({ color }) => <WWIcon source="cellphone-link" size={24} color={color} />,
+  }}
+/>
+<Tab.Screen
+  name="Deployments"
+  component={Deployments}
+  options={{
+    tabBarIcon: ({ color }) => <WWIcon source="map-marker" size={24} color={color} />,
+  }}
+/>
+<Tab.Screen
+  name="Projects"
+  component={Projects}
+  options={{
+    tabBarIcon: ({ color }) => <WWIcon source="folder" size={24} color={color} />,
+  }}
+/>
+<Tab.Screen
+  name="Profile"
+  component={Profile}
+  options={{
+    tabBarIcon: ({ color }) => <WWIcon source="account" size={24} color={color} />,
+  }}
+/>
+```
+
+### Key Screens
+
+- **Devices**: Scan and connect to Wildlife Watcher cameras via Bluetooth
+- **Deployments**: View and manage camera deployments on a map
+- **Projects**: Organize deployments into projects
+- **Profile**: User settings and app configuration
+
+## Developer Tools
+
+### Reload the App
+
+- **iOS**: Press `Cmd + R` in the simulator
+- **Android**: Double-tap `R` on your keyboard or shake the device
+
+### Open Developer Menu
+
+- **iOS**: Press `Cmd + D` in the simulator
+- **Android**: Press `Cmd + M` (Mac) or `Ctrl + M` (Windows/Linux), or shake the device
+
+### Hot Reloading
+
+React Native supports Fast Refresh, which automatically reloads the app when you save changes to your code. This is enabled by default.
+
+## Common Issues
+
+<AccordionGroup>
+  <Accordion title="Metro bundler port already in use">
+    If port 8081 is already in use, kill the process:
+    ```bash
+    npx react-native start --reset-cache
+    ```
+  </Accordion>
+
+  <Accordion title="iOS build fails">
+    Try cleaning the build:
+    ```bash
+    cd ios
+    rm -rf Pods Podfile.lock
+    bundle exec pod install
+    cd ..
+    npm run ios
+    ```
+  </Accordion>
+
+  <Accordion title="Android build fails">
+    Clean the Android build:
+    ```bash
+    cd android
+    ./gradlew clean
+    cd ..
+    npm run android
+    ```
+  </Accordion>
+
+  <Accordion title="Bluetooth permissions not working">
+    Ensure you've granted the necessary permissions:
+    - **iOS**: Location permissions are required for BLE scanning
+    - **Android**: Location and Bluetooth permissions must be granted
+    
+    See the [permissions guide](/guides/permissions) for detailed setup.
+  </Accordion>
+</AccordionGroup>
+
+## Next Steps
+
+Now that you have the app running, explore these topics:
+
+<CardGroup cols={2}>
+  <Card title="BLE Communication" icon="bluetooth" href="/features/ble-communication">
+    Learn how to scan and connect to devices
+  </Card>
+  <Card title="Device Management" icon="camera" href="/features/device-management">
+    Configure Wildlife Watcher cameras
+  </Card>
+  <Card title="Project Structure" icon="folder-tree" href="/development/project-structure">
+    Understand the codebase organization
+  </Card>
+  <Card title="API Integration" icon="code" href="/development/api-integration">
+    Work with the Redux API
+  </Card>
+</CardGroup>
+
+<Tip>
+  Join the discussion on [GitHub](https://github.com/wildlifeai/wildlife-watcher-mobile-app) to ask questions and share your experience!
+</Tip>

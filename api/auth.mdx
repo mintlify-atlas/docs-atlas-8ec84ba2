@@ -1,0 +1,357 @@
+---
+title: Authentication API
+description: User authentication and registration endpoints
+---
+
+## Overview
+
+The Authentication API handles user login and registration. All authentication endpoints are defined in `src/redux/api/auth/index.ts`.
+
+## Available Hooks
+
+```typescript
+import { useLoginMutation, useRegisterMutation } from '@/redux/api/auth'
+```
+
+## Login
+
+Authenticate a user with their credentials.
+
+### Hook
+
+```typescript
+useLoginMutation()
+```
+
+### Request Parameters
+
+<ParamField path="identifier" type="string" required>
+  User's email address or username
+</ParamField>
+
+<ParamField path="password" type="string" required>
+  User's password
+</ParamField>
+
+### Request Type
+
+```typescript
+type LoginRequest = {
+  identifier: string // email or username
+  password: string
+}
+```
+
+### Response
+
+<ResponseField name="jwt" type="string">
+  JSON Web Token for authenticated requests
+</ResponseField>
+
+<ResponseField name="user" type="object">
+  User information object
+  
+  <ResponseField name="id" type="number">
+    Unique user identifier
+  </ResponseField>
+  
+  <ResponseField name="username" type="string">
+    Username
+  </ResponseField>
+  
+  <ResponseField name="email" type="string">
+    User's email address
+  </ResponseField>
+  
+  <ResponseField name="confirmed" type="boolean">
+    Whether the user's email is confirmed
+  </ResponseField>
+  
+  <ResponseField name="blocked" type="boolean">
+    Whether the user account is blocked
+  </ResponseField>
+  
+  <ResponseField name="createdAt" type="string">
+    Account creation timestamp
+  </ResponseField>
+  
+  <ResponseField name="updatedAt" type="string">
+    Last update timestamp
+  </ResponseField>
+</ResponseField>
+
+### Response Type
+
+```typescript
+type AuthResponse = {
+  jwt: string
+  user: {
+    id: number
+    username: string
+    email: string
+    confirmed: boolean
+    blocked: boolean
+    createdAt: string
+    updatedAt: string
+  }
+}
+```
+
+### Usage Example
+
+<CodeGroup>
+
+```typescript Component
+import { useLoginMutation } from '@/redux/api/auth'
+import { useState } from 'react'
+
+function LoginForm() {
+  const [login, { isLoading, error }] = useLoginMutation()
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
+
+  const handleLogin = async (e) => {
+    e.preventDefault()
+    
+    try {
+      const result = await login({
+        identifier: email,
+        password: password,
+      }).unwrap()
+      
+      // Store the JWT token
+      localStorage.setItem('token', result.jwt)
+      console.log('Logged in as:', result.user.username)
+      
+      // Navigate to home screen
+    } catch (err) {
+      console.error('Login failed:', err)
+    }
+  }
+
+  return (
+    <form onSubmit={handleLogin}>
+      <input
+        type="email"
+        value={email}
+        onChange={(e) => setEmail(e.target.value)}
+        placeholder="Email"
+      />
+      <input
+        type="password"
+        value={password}
+        onChange={(e) => setPassword(e.target.value)}
+        placeholder="Password"
+      />
+      <button type="submit" disabled={isLoading}>
+        {isLoading ? 'Logging in...' : 'Login'}
+      </button>
+      {error && <div>Error: {error.message}</div>}
+    </form>
+  )
+}
+```
+
+```typescript Request
+{
+  "identifier": "john.doe@example.com",
+  "password": "securePassword123"
+}
+```
+
+```typescript Response
+{
+  "jwt": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+  "user": {
+    "id": 1,
+    "username": "johndoe",
+    "email": "john.doe@example.com",
+    "confirmed": true,
+    "blocked": false,
+    "createdAt": "2024-01-15T10:30:00.000Z",
+    "updatedAt": "2024-01-15T10:30:00.000Z"
+  }
+}
+```
+
+</CodeGroup>
+
+## Register
+
+Create a new user account.
+
+### Hook
+
+```typescript
+useRegisterMutation()
+```
+
+### Request Parameters
+
+<ParamField path="username" type="string" required>
+  Desired username (must be unique)
+</ParamField>
+
+<ParamField path="email" type="string" required>
+  User's email address (must be unique)
+</ParamField>
+
+<ParamField path="password" type="string" required>
+  User's password (minimum 6 characters)
+</ParamField>
+
+### Request Type
+
+```typescript
+type RegisterRequest = {
+  username: string
+  email: string
+  password: string
+}
+```
+
+### Response
+
+Returns the same `AuthResponse` type as the login endpoint.
+
+### Usage Example
+
+<CodeGroup>
+
+```typescript Component
+import { useRegisterMutation } from '@/redux/api/auth'
+import { useState } from 'react'
+
+function RegisterForm() {
+  const [register, { isLoading, error }] = useRegisterMutation()
+  const [formData, setFormData] = useState({
+    username: '',
+    email: '',
+    password: '',
+  })
+
+  const handleRegister = async (e) => {
+    e.preventDefault()
+    
+    try {
+      const result = await register(formData).unwrap()
+      
+      // Store the JWT token
+      localStorage.setItem('token', result.jwt)
+      console.log('Registered successfully:', result.user.username)
+      
+      // Navigate to home screen
+    } catch (err) {
+      console.error('Registration failed:', err)
+    }
+  }
+
+  const handleChange = (e) => {
+    setFormData({
+      ...formData,
+      [e.target.name]: e.target.value,
+    })
+  }
+
+  return (
+    <form onSubmit={handleRegister}>
+      <input
+        type="text"
+        name="username"
+        value={formData.username}
+        onChange={handleChange}
+        placeholder="Username"
+      />
+      <input
+        type="email"
+        name="email"
+        value={formData.email}
+        onChange={handleChange}
+        placeholder="Email"
+      />
+      <input
+        type="password"
+        name="password"
+        value={formData.password}
+        onChange={handleChange}
+        placeholder="Password"
+      />
+      <button type="submit" disabled={isLoading}>
+        {isLoading ? 'Creating account...' : 'Register'}
+      </button>
+      {error && <div>Error: {error.message}</div>}
+    </form>
+  )
+}
+```
+
+```typescript Request
+{
+  "username": "johndoe",
+  "email": "john.doe@example.com",
+  "password": "securePassword123"
+}
+```
+
+```typescript Response
+{
+  "jwt": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+  "user": {
+    "id": 1,
+    "username": "johndoe",
+    "email": "john.doe@example.com",
+    "confirmed": false,
+    "blocked": false,
+    "createdAt": "2024-01-15T10:30:00.000Z",
+    "updatedAt": "2024-01-15T10:30:00.000Z"
+  }
+}
+```
+
+</CodeGroup>
+
+## Storing Authentication State
+
+After successful authentication, store the JWT token for subsequent API requests:
+
+```typescript
+// Store token in AsyncStorage (React Native)
+import AsyncStorage from '@react-native-async-storage/async-storage'
+
+const result = await login(credentials).unwrap()
+await AsyncStorage.setItem('authToken', result.jwt)
+
+// Or in localStorage (web)
+localStorage.setItem('authToken', result.jwt)
+```
+
+## Using Authenticated Requests
+
+The `extendedBaseQuery` automatically includes the JWT token in request headers when available. Make sure your token is accessible to the base query configuration.
+
+## Error Handling
+
+Common authentication errors:
+
+- **400 Bad Request**: Invalid credentials or missing required fields
+- **401 Unauthorized**: Incorrect email/username or password
+- **429 Too Many Requests**: Rate limit exceeded
+
+```typescript
+const [login, { error }] = useLoginMutation()
+
+if (error) {
+  if ('status' in error) {
+    switch (error.status) {
+      case 400:
+        console.error('Invalid input')
+        break
+      case 401:
+        console.error('Invalid credentials')
+        break
+      default:
+        console.error('An error occurred')
+    }
+  }
+}
+```

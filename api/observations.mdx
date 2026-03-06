@@ -1,0 +1,542 @@
+---
+title: Observations API
+description: Record and manage wildlife observations
+---
+
+## Overview
+
+The Observations API manages wildlife observation records captured by camera traps. Observations link media files to species identifications and classification data. All observation endpoints are defined in `src/redux/api/observations/index.ts`.
+
+## Available Hooks
+
+```typescript
+import {
+  useGetObservationsQuery,
+  useGetObservationByIdQuery,
+  useCreateObservationMutation,
+  useUpdateObservationMutation,
+  useDeleteObservationMutation,
+} from '@/redux/api/observations'
+```
+
+## Observation Types
+
+```typescript
+type Observation = {
+  id: string
+  observationID: string
+  deploymentID?: string
+  mediaID?: string
+  eventID?: string
+  eventStart?: string
+  eventEnd?: string
+  observationLevel?: string
+  observationType?: string
+  scientificName?: string
+  count?: number
+  individualID?: string
+  classificationMethod?: string
+  classifiedBy?: string
+  classificationTimestamp?: string
+  classificationProbability?: number
+  observationComments?: string
+  classifiedByModelID?: string
+}
+
+type ObservationCreate = Omit<Observation, "id" | "observationID">
+type ObservationUpdate = ObservationCreate
+```
+
+## Get All Observations
+
+Fetch a list of all observations.
+
+### Hook
+
+```typescript
+useGetObservationsQuery()
+```
+
+### Parameters
+
+None
+
+### Response
+
+Returns an array of `Observation` objects.
+
+<ResponseField name="Observation[]" type="array">
+  Array of wildlife observation records
+  
+  <ResponseField name="id" type="string">
+    Internal unique identifier
+  </ResponseField>
+  
+  <ResponseField name="observationID" type="string">
+    Observation identifier
+  </ResponseField>
+  
+  <ResponseField name="deploymentID" type="string" optional>
+    Associated deployment ID
+  </ResponseField>
+  
+  <ResponseField name="mediaID" type="string" optional>
+    Associated media file ID
+  </ResponseField>
+  
+  <ResponseField name="scientificName" type="string" optional>
+    Species scientific name (e.g., "Panthera onca")
+  </ResponseField>
+  
+  <ResponseField name="count" type="number" optional>
+    Number of individuals observed
+  </ResponseField>
+  
+  <ResponseField name="classificationMethod" type="string" optional>
+    Method used for classification (e.g., "AI", "manual")
+  </ResponseField>
+  
+  <ResponseField name="classificationProbability" type="number" optional>
+    Confidence score (0-1) for AI classifications
+  </ResponseField>
+  
+  <ResponseField name="observationComments" type="string" optional>
+    Additional notes about the observation
+  </ResponseField>
+</ResponseField>
+
+### Usage Example
+
+<CodeGroup>
+
+```typescript Component
+import { useGetObservationsQuery } from '@/redux/api/observations'
+
+function ObservationList() {
+  const { data: observations, isLoading } = useGetObservationsQuery()
+
+  if (isLoading) return <Loading />
+
+  // Group by species
+  const bySpecies = observations?.reduce((acc, obs) => {
+    const species = obs.scientificName || 'Unknown'
+    if (!acc[species]) acc[species] = []
+    acc[species].push(obs)
+    return acc
+  }, {})
+
+  return (
+    <div>
+      <h2>Observations</h2>
+      {Object.entries(bySpecies || {}).map(([species, obs]) => (
+        <div key={species}>
+          <h3>{species}</h3>
+          <p>Total sightings: {obs.length}</p>
+          <p>Total count: {obs.reduce((sum, o) => sum + (o.count || 0), 0)}</p>
+        </div>
+      ))}
+    </div>
+  )
+}
+```
+
+```typescript Response
+[
+  {
+    "id": "obs_001",
+    "observationID": "OBS-001",
+    "deploymentID": "dep_456",
+    "mediaID": "media_789",
+    "eventStart": "2024-03-15T14:23:00Z",
+    "scientificName": "Panthera onca",
+    "count": 1,
+    "classificationMethod": "AI",
+    "classifiedBy": "WildlifeAI v2.1",
+    "classificationTimestamp": "2024-03-15T14:25:00Z",
+    "classificationProbability": 0.94,
+    "observationComments": "Adult male, distinctive rosette pattern"
+  }
+]
+```
+
+</CodeGroup>
+
+## Get Observation by ID
+
+Fetch a single observation by its ID.
+
+### Hook
+
+```typescript
+useGetObservationByIdQuery(id: string)
+```
+
+### Parameters
+
+<ParamField path="id" type="string" required>
+  The unique observation ID
+</ParamField>
+
+### Response
+
+Returns a single `Observation` object.
+
+### Usage Example
+
+<CodeGroup>
+
+```typescript Component
+import { useGetObservationByIdQuery } from '@/redux/api/observations'
+import { useGetMediaByIdQuery } from '@/redux/api/media'
+
+function ObservationDetail({ observationId }: { observationId: string }) {
+  const { data: observation, isLoading } = useGetObservationByIdQuery(observationId)
+  const { data: media } = useGetMediaByIdQuery(observation?.mediaID, {
+    skip: !observation?.mediaID,
+  })
+
+  if (isLoading) return <Loading />
+  if (!observation) return <NotFound />
+
+  return (
+    <div>
+      <h1>{observation.scientificName || 'Unknown Species'}</h1>
+      
+      {media && <img src={media.filePath} alt="Observation" />}
+      
+      <div>
+        <p>Count: {observation.count}</p>
+        <p>Date: {new Date(observation.eventStart).toLocaleString()}</p>
+        <p>Classification: {observation.classificationMethod}</p>
+        {observation.classificationProbability && (
+          <p>Confidence: {(observation.classificationProbability * 100).toFixed(1)}%</p>
+        )}
+      </div>
+      
+      {observation.observationComments && (
+        <div>
+          <h3>Notes</h3>
+          <p>{observation.observationComments}</p>
+        </div>
+      )}
+    </div>
+  )
+}
+```
+
+</CodeGroup>
+
+## Create Observation
+
+Create a new observation record.
+
+### Hook
+
+```typescript
+useCreateObservationMutation()
+```
+
+### Request Parameters
+
+<ParamField path="deploymentID" type="string" optional>
+  Associated deployment ID
+</ParamField>
+
+<ParamField path="mediaID" type="string" optional>
+  Associated media file ID
+</ParamField>
+
+<ParamField path="eventStart" type="string" optional>
+  Observation event start time (ISO 8601)
+</ParamField>
+
+<ParamField path="scientificName" type="string" optional>
+  Species scientific name
+</ParamField>
+
+<ParamField path="count" type="number" optional>
+  Number of individuals
+</ParamField>
+
+<ParamField path="classificationMethod" type="string" optional>
+  Classification method (e.g., "AI", "manual")
+</ParamField>
+
+<ParamField path="classificationProbability" type="number" optional>
+  Confidence score (0-1)
+</ParamField>
+
+<ParamField path="observationComments" type="string" optional>
+  Additional notes
+</ParamField>
+
+### Response
+
+Returns the created `Observation` object with auto-generated `id` and `observationID`.
+
+### Usage Example
+
+<CodeGroup>
+
+```typescript Component
+import { useCreateObservationMutation } from '@/redux/api/observations'
+
+function CreateObservation({ mediaId, deploymentId }) {
+  const [createObservation, { isLoading }] = useCreateObservationMutation()
+
+  const handleAIClassification = async (aiResult) => {
+    try {
+      const observation = await createObservation({
+        deploymentID: deploymentId,
+        mediaID: mediaId,
+        eventStart: new Date().toISOString(),
+        scientificName: aiResult.species,
+        count: aiResult.count,
+        classificationMethod: 'AI',
+        classifiedBy: 'WildlifeAI v2.1',
+        classificationTimestamp: new Date().toISOString(),
+        classificationProbability: aiResult.confidence,
+      }).unwrap()
+      
+      console.log('Observation created:', observation.observationID)
+    } catch (error) {
+      console.error('Failed to create observation:', error)
+    }
+  }
+
+  return (
+    <button onClick={() => handleAIClassification({ species: 'Panthera onca', count: 1, confidence: 0.94 })}>
+      Classify with AI
+    </button>
+  )
+}
+```
+
+```typescript Request
+{
+  "deploymentID": "dep_456",
+  "mediaID": "media_789",
+  "eventStart": "2024-03-15T14:23:00Z",
+  "scientificName": "Panthera onca",
+  "count": 1,
+  "classificationMethod": "AI",
+  "classifiedBy": "WildlifeAI v2.1",
+  "classificationTimestamp": "2024-03-15T14:25:00Z",
+  "classificationProbability": 0.94
+}
+```
+
+```typescript Response
+{
+  "id": "obs_001",
+  "observationID": "OBS-001",
+  "deploymentID": "dep_456",
+  "mediaID": "media_789",
+  "eventStart": "2024-03-15T14:23:00Z",
+  "scientificName": "Panthera onca",
+  "count": 1,
+  "classificationMethod": "AI",
+  "classifiedBy": "WildlifeAI v2.1",
+  "classificationTimestamp": "2024-03-15T14:25:00Z",
+  "classificationProbability": 0.94
+}
+```
+
+</CodeGroup>
+
+## Update Observation
+
+Update an existing observation.
+
+### Hook
+
+```typescript
+useUpdateObservationMutation()
+```
+
+### Request Parameters
+
+<ParamField path="id" type="string" required>
+  Observation ID to update
+</ParamField>
+
+<ParamField path="body" type="ObservationUpdate" required>
+  Observation fields to update
+</ParamField>
+
+### Response
+
+Returns the updated `Observation` object.
+
+### Usage Example
+
+<CodeGroup>
+
+```typescript Component
+import { useUpdateObservationMutation } from '@/redux/api/observations'
+import { useState } from 'react'
+
+function ReviewObservation({ observation }: { observation: Observation }) {
+  const [updateObservation, { isLoading }] = useUpdateObservationMutation()
+  const [comments, setComments] = useState(observation.observationComments || '')
+
+  const handleAddComments = async () => {
+    try {
+      const updated = await updateObservation({
+        id: observation.id,
+        body: {
+          ...observation,
+          observationComments: comments,
+        },
+      }).unwrap()
+      
+      console.log('Observation updated:', updated)
+    } catch (error) {
+      console.error('Failed to update observation:', error)
+    }
+  }
+
+  return (
+    <div>
+      <textarea
+        value={comments}
+        onChange={(e) => setComments(e.target.value)}
+        placeholder="Add comments..."
+      />
+      <button onClick={handleAddComments} disabled={isLoading}>
+        {isLoading ? 'Saving...' : 'Save Comments'}
+      </button>
+    </div>
+  )
+}
+```
+
+</CodeGroup>
+
+## Delete Observation
+
+Delete an observation by ID.
+
+### Hook
+
+```typescript
+useDeleteObservationMutation()
+```
+
+### Parameters
+
+<ParamField path="id" type="string" required>
+  Observation ID to delete
+</ParamField>
+
+### Response
+
+Returns `void` on success.
+
+### Usage Example
+
+<CodeGroup>
+
+```typescript Component
+import { useDeleteObservationMutation } from '@/redux/api/observations'
+
+function DeleteObservation({ observationId }: { observationId: string }) {
+  const [deleteObservation, { isLoading }] = useDeleteObservationMutation()
+
+  const handleDelete = async () => {
+    if (!confirm('Delete this observation?')) return
+    
+    try {
+      await deleteObservation(observationId).unwrap()
+      console.log('Observation deleted')
+    } catch (error) {
+      console.error('Failed to delete observation:', error)
+    }
+  }
+
+  return (
+    <button onClick={handleDelete} disabled={isLoading}>
+      {isLoading ? 'Deleting...' : 'Delete'}
+    </button>
+  )
+}
+```
+
+</CodeGroup>
+
+## Working with Classification Data
+
+### AI vs Manual Classification
+
+Track classification methods:
+
+```typescript
+const { data: observations } = useGetObservationsQuery()
+
+const aiClassified = observations?.filter(
+  obs => obs.classificationMethod === 'AI'
+)
+
+const manuallyClassified = observations?.filter(
+  obs => obs.classificationMethod === 'manual'
+)
+
+const needsReview = observations?.filter(
+  obs => obs.classificationMethod === 'AI' && 
+         obs.classificationProbability < 0.8
+)
+```
+
+### Species Statistics
+
+Aggregate observation data:
+
+```typescript
+const { data: observations } = useGetObservationsQuery()
+
+const speciesStats = observations?.reduce((acc, obs) => {
+  const species = obs.scientificName || 'Unknown'
+  if (!acc[species]) {
+    acc[species] = {
+      count: 0,
+      observations: 0,
+      avgConfidence: 0,
+    }
+  }
+  
+  acc[species].count += obs.count || 0
+  acc[species].observations += 1
+  
+  if (obs.classificationProbability) {
+    acc[species].avgConfidence = 
+      (acc[species].avgConfidence * (acc[species].observations - 1) + 
+       obs.classificationProbability) / acc[species].observations
+  }
+  
+  return acc
+}, {})
+```
+
+### Time-Based Analysis
+
+Analyze observation patterns:
+
+```typescript
+const { data: observations } = useGetObservationsQuery()
+
+// Group by hour of day
+const byTimeOfDay = observations?.reduce((acc, obs) => {
+  if (!obs.eventStart) return acc
+  
+  const hour = new Date(obs.eventStart).getHours()
+  if (!acc[hour]) acc[hour] = []
+  acc[hour].push(obs)
+  
+  return acc
+}, {})
+
+// Most active hours
+const activityPeaks = Object.entries(byTimeOfDay || {})
+  .sort(([, a], [, b]) => b.length - a.length)
+  .slice(0, 3)
+```

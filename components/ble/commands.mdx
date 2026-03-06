@@ -1,0 +1,413 @@
+---
+title: "BLE Commands"
+description: "Complete reference for all BLE commands used to communicate with Wildlife Watcher devices"
+---
+
+# BLE Commands
+
+The Wildlife Watcher app uses a structured command system to communicate with devices over Bluetooth Low Energy (BLE). All commands are defined in the `COMMANDS` object and accessed via the `CommandNames` enum.
+
+## Command Structure
+
+Each command is defined as a `Command` type with the following properties:
+
+<ParamField path="name" type="CommandNames" required>
+  The unique identifier for the command from the CommandNames enum
+</ParamField>
+
+<ParamField path="readCommand" type="string">
+  The string sent to the device when reading a value. If undefined, the command is write-only.
+</ParamField>
+
+<ParamField path="writeCommand" type="(value?: string) => string">
+  A function that constructs the write command string. If undefined, the command is read-only.
+</ParamField>
+
+<ParamField path="readRegex" type="RegExp">
+  Regular expression to parse the response value from the device. The first capture group contains the extracted value.
+</ParamField>
+
+<Note>
+  If a command has no `readCommand`, useCommand will ignore any get calls. If it has neither `readCommand` nor `readRegex`, it's an action-only command with no feedback.
+</Note>
+
+## Command Reference
+
+### Device Information
+
+#### ID
+
+Reads the device identifier.
+
+<CodeGroup>
+```typescript Definition
+{
+  name: CommandNames.ID,
+  readCommand: "id",
+}
+```
+
+```typescript Usage
+import { CommandNames, CommandControlTypes } from '../ble/types'
+
+write(device, [
+  [CommandNames.ID, { control: CommandControlTypes.READ }]
+])
+```
+</CodeGroup>
+
+<ResponseField name="Returns" type="string">
+  The device ID as a string
+</ResponseField>
+
+#### VERSION
+
+Reads the firmware version.
+
+<CodeGroup>
+```typescript Definition
+{
+  name: CommandNames.VERSION,
+  readCommand: "ver",
+}
+```
+
+```typescript Usage
+write(device, [
+  [CommandNames.VERSION, { control: CommandControlTypes.READ }]
+])
+```
+</CodeGroup>
+
+#### DEVICE
+
+Reads general device information.
+
+<CodeGroup>
+```typescript Definition
+{
+  name: CommandNames.DEVICE,
+  readCommand: "device",
+}
+```
+</CodeGroup>
+
+### Battery
+
+#### BATTERY
+
+Reads the current battery level as a percentage.
+
+<CodeGroup>
+```typescript Definition
+{
+  name: CommandNames.BATTERY,
+  readCommand: "battery",
+  readRegex: /\bBattery\s=\s(100|\d{1,3})%/,
+}
+```
+
+```typescript Usage
+const { get } = useCommand({ 
+  deviceId: device.id, 
+  command: COMMANDS.BATTERY 
+})
+
+get()
+```
+</CodeGroup>
+
+<ResponseField name="Returns" type="string">
+  Battery percentage (0-100)
+</ResponseField>
+
+### Status Commands
+
+#### SENSOR
+
+Reads or writes the sensor enable/disable state.
+
+<CodeGroup>
+```typescript Definition
+{
+  name: CommandNames.SENSOR,
+  readCommand: "status",
+  readRegex: /Trap: (\w+). Sensor: (enabled|disabled). LoRaWan: ((?:\w+\s*)+)./,
+  writeCommand: (value?: string) => `${value}`,
+}
+```
+
+```typescript Usage
+const { set } = useCommand({ 
+  deviceId: device.id, 
+  command: COMMANDS.SENSOR 
+})
+
+set("enable")
+set("disable")
+```
+</CodeGroup>
+
+<ResponseField name="Returns" type="string">
+  "enable" or "disable" (normalized from "enabled"/"disabled")
+</ResponseField>
+
+#### TRAP
+
+Reads the trap status.
+
+<CodeGroup>
+```typescript Definition
+{
+  name: CommandNames.TRAP,
+  readCommand: "status",
+  readRegex: /Trap: (\w+). Sensor: (enabled|disabled). LoRaWan: ((?:\w+\s*)+)./,
+}
+```
+</CodeGroup>
+
+<ResponseField name="Returns" type="string">
+  Current trap status
+</ResponseField>
+
+#### LORAWAN
+
+Reads the LoRaWAN connection status.
+
+<CodeGroup>
+```typescript Definition
+{
+  name: CommandNames.LORAWAN,
+  readCommand: "status",
+  readRegex: /Trap: (\w+). Sensor: (enabled|disabled). LoRaWan: ((?:\w+\s*)+)./,
+}
+```
+</CodeGroup>
+
+<ResponseField name="Returns" type="string">
+  LoRaWAN status string
+</ResponseField>
+
+### Configuration Commands
+
+#### HEARTBEAT
+
+Reads or writes the heartbeat interval.
+
+<CodeGroup>
+```typescript Definition
+{
+  name: CommandNames.HEARTBEAT,
+  readCommand: "get heartbeat",
+  readRegex: /\bheartbeat\s+is\s+(\d+d|\d+h|\d+m|\d+s)\b/,
+  writeCommand: (value?: string) => `heartbeat ${value}`,
+}
+```
+
+```typescript Usage
+const { set, get } = useCommand({ 
+  deviceId: device.id, 
+  command: COMMANDS.HEARTBEAT 
+})
+
+set("5m")
+get()
+```
+</CodeGroup>
+
+<ResponseField name="Returns" type="string">
+  Time interval (e.g., "5m", "1h", "30s", "1d")
+</ResponseField>
+
+#### DEVEUI
+
+Reads or writes the LoRaWAN Device EUI.
+
+<CodeGroup>
+```typescript Definition
+{
+  name: CommandNames.DEVEUI,
+  readCommand: "get deveui",
+  readRegex: /\DevEui:\s([a-zA-Z0-9:]+)\b/,
+  writeCommand: (value?: string) => `deveui ${value}`,
+}
+```
+
+```typescript Usage
+set("AA:BB:CC:DD:EE:FF:00:11")
+```
+</CodeGroup>
+
+<ResponseField name="Returns" type="string">
+  Device EUI in colon-separated hex format
+</ResponseField>
+
+#### APPEUI
+
+Reads or writes the LoRaWAN Application EUI.
+
+<CodeGroup>
+```typescript Definition
+{
+  name: CommandNames.APPEUI,
+  readCommand: "get appeui",
+  readRegex: /\bAppEui:\s([a-zA-Z0-9:]+)\b/,
+  writeCommand: (value?: string) => `appeui ${value}`,
+}
+```
+</CodeGroup>
+
+<ResponseField name="Returns" type="string">
+  Application EUI in colon-separated hex format
+</ResponseField>
+
+#### APPKEY
+
+Reads or writes the LoRaWAN Application Key.
+
+<CodeGroup>
+```typescript Definition
+{
+  name: CommandNames.APPKEY,
+  readCommand: "get appkey",
+  readRegex: /\bAppKey:\s([a-zA-Z0-9:]+)\b/,
+  writeCommand: (value?: string) => `appkey ${value}`,
+}
+```
+</CodeGroup>
+
+<ResponseField name="Returns" type="string">
+  Application Key in colon-separated hex format
+</ResponseField>
+
+### Action Commands
+
+#### PING
+
+Sends a ping to check device connectivity. No response parsing.
+
+<CodeGroup>
+```typescript Definition
+{
+  name: CommandNames.PING,
+  writeCommand: () => "ping",
+}
+```
+
+```typescript Usage
+write(device, [
+  [CommandNames.PING, { control: CommandControlTypes.WRITE }]
+])
+```
+</CodeGroup>
+
+#### RESET
+
+Resets the device after disconnection.
+
+<CodeGroup>
+```typescript Definition
+{
+  name: CommandNames.RESET,
+  writeCommand: () => "reset",
+  readRegex: /(Device will reset after disconnecting.)\s*/,
+}
+```
+</CodeGroup>
+
+<ResponseField name="Returns" type="string">
+  "Device will reset after disconnecting."
+</ResponseField>
+
+#### ERASE
+
+Erases the device's non-volatile memory after disconnection.
+
+<CodeGroup>
+```typescript Definition
+{
+  name: CommandNames.ERASE,
+  writeCommand: () => "erase",
+  readRegex: /(NVM will be erased after disconnecting.)\s*/,
+}
+```
+</CodeGroup>
+
+<ResponseField name="Returns" type="string">
+  "NVM will be erased after disconnecting."
+</ResponseField>
+
+#### DISCONNECT
+
+Disconnects from the device. No response expected.
+
+<CodeGroup>
+```typescript Definition
+{
+  name: CommandNames.DISCONNECT,
+  writeCommand: () => "dis",
+}
+```
+</CodeGroup>
+
+#### DFU
+
+Puts the device into Device Firmware Update mode after disconnection.
+
+<CodeGroup>
+```typescript Definition
+{
+  name: CommandNames.DFU,
+  writeCommand: () => "dfu",
+  readRegex: /(Device will enter DFU mode after disconnecting.)\s*/,
+}
+```
+</CodeGroup>
+
+<ResponseField name="Returns" type="string">
+  "Device will enter DFU mode after disconnecting."
+</ResponseField>
+
+## Command Parsing
+
+The `constructCommandString` function from `parser.ts` constructs the appropriate command string:
+
+<CodeGroup>
+```typescript Function Signature
+constructCommandString(
+  name: CommandNames | string,
+  options: CommandConstructOptions
+): string | undefined
+```
+
+```typescript Example
+import { constructCommandString, CommandControlTypes } from '../ble/parser'
+
+const readCmd = constructCommandString(
+  CommandNames.BATTERY,
+  { control: CommandControlTypes.READ }
+)
+// Returns: "battery"
+
+const writeCmd = constructCommandString(
+  CommandNames.HEARTBEAT,
+  { control: CommandControlTypes.WRITE, value: "5m" }
+)
+// Returns: "heartbeat 5m"
+```
+</CodeGroup>
+
+### CommandConstructOptions
+
+<ParamField path="control" type="CommandControlTypes" required>
+  Either `CommandControlTypes.READ` or `CommandControlTypes.WRITE`
+</ParamField>
+
+<ParamField path="value" type="string">
+  The value to write (only used for WRITE operations)
+</ParamField>
+
+## Related
+
+- [BLE Hooks](/components/ble/hooks) - React hooks for working with commands
+- [BLE Providers](/components/ble/providers) - Context providers for BLE functionality

@@ -1,0 +1,490 @@
+---
+title: Permissions
+description: Configure and manage Android and iOS permissions for Bluetooth Low Energy and location services
+icon: shield-check
+---
+
+The Wildlife Watcher mobile app requires specific permissions to communicate with BLE devices and access location services. This guide covers permission setup for both Android and iOS platforms.
+
+## Overview
+
+The app requires the following permissions:
+
+- **Bluetooth** - To scan and connect to Wildlife Watcher camera devices
+- **Location** - Required for BLE scanning on Android and map features
+- **Notifications** - For DFU (Device Firmware Update) progress alerts
+
+## Android Permissions
+
+### Manifest Configuration
+
+Permissions are declared in `android/app/src/main/AndroidManifest.xml`:
+
+```xml
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+  <!-- Internet access -->
+  <uses-permission android:name="android.permission.INTERNET" />
+
+  <!-- Legacy Bluetooth (Android 11 and below) -->
+  <uses-permission 
+    android:name="android.permission.BLUETOOTH" 
+    android:maxSdkVersion="30" />
+  <uses-permission 
+    android:name="android.permission.BLUETOOTH_ADMIN" 
+    android:maxSdkVersion="30" />
+  
+  <!-- Location permissions -->
+  <uses-permission 
+    android:name="android.permission.ACCESS_COARSE_LOCATION" 
+    android:maxSdkVersion="28"/>
+  <uses-permission-sdk-23 
+    android:name="android.permission.ACCESS_FINE_LOCATION" />
+  
+  <!-- New Bluetooth (Android 12+) -->
+  <uses-permission 
+    android:name="android.permission.BLUETOOTH_CONNECT" 
+    android:usesPermissionFlags="neverForLocation" />
+  <uses-permission 
+    android:name="android.permission.BLUETOOTH_SCAN" />
+  
+  <!-- Storage and services -->
+  <uses-permission 
+    android:name="android.permission.READ_EXTERNAL_STORAGE"/>
+  <uses-permission 
+    android:name="android.permission.FOREGROUND_SERVICE"/>
+  <uses-permission 
+    android:name="android.permission.FOREGROUND_SERVICE_CONNECTED_DEVICE"/>
+  <uses-permission 
+    android:name="android.permission.POST_NOTIFICATIONS"/>
+
+</manifest>
+```
+
+### Android Version-Specific Permissions
+
+The app dynamically requests permissions based on Android version:
+
+```typescript
+// From src/redux/slices/androidPermissionsSlice.ts
+
+const PERMISSIONS =
+  (Platform.Version as number) >= 31
+    ? [
+        // Android 12+ (API 31+)
+        PermissionsAndroid.PERMISSIONS.BLUETOOTH_CONNECT,
+        PermissionsAndroid.PERMISSIONS.BLUETOOTH_SCAN,
+        PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION,
+      ]
+    : [
+        // Android 11 and below
+        PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION
+      ];
+```
+
+<Note>
+  Android 12 (API 31) introduced new Bluetooth permissions that don't require location access when using `neverForLocation` flag.
+</Note>
+
+### Android Permission Flow
+
+<Steps>
+  <Step title="Check Permissions">
+    On app startup, the app checks if permissions are granted:
+
+    ```typescript
+    const checkPermissions = async () => {
+      if (Platform.OS === 'android' && Platform.Version >= 23) {
+        const promises = PERMISSIONS.map((permission) => {
+          return PermissionsAndroid.check(permission);
+        });
+        
+        const results = await Promise.all(promises);
+        const allGranted = results.every(granted => granted);
+        
+        return allGranted;
+      }
+      return true; // iOS or older Android
+    };
+    ```
+  </Step>
+
+  <Step title="Request Permissions">
+    If permissions are not granted, request them:
+
+    ```typescript
+    const requestPermissions = async () => {
+      const results = await PermissionsAndroid.requestMultiple(PERMISSIONS);
+      
+      // Check if all permissions were granted
+      const allGranted = Object.values(results).every(
+        result => result === 'granted'
+      );
+      
+      return allGranted;
+    };
+    ```
+  </Step>
+
+  <Step title="Handle Denial">
+    Track permanently denied permissions:
+
+    ```typescript
+    const neverAskAgain = [];
+    
+    for (const key in results) {
+      if (results[key] === 'never_ask_again') {
+        neverAskAgain.push(key);
+      }
+    }
+    
+    if (neverAskAgain.length > 0) {
+      // Show instructions to enable in system settings
+      showSettingsAlert();
+    }
+    ```
+  </Step>
+</Steps>
+
+### Android Permissions Provider
+
+The `AndroidPermissionsProvider` blocks app access until permissions are granted:
+
+```typescript
+import { AndroidPermissionsProvider } from './providers/AndroidPermissionsProvider';
+
+export const AndroidPermissionsProvider = ({ children }) => {
+  useAndroidPermissions();
+  
+  const { initialLoad, permissionsGranted } = useAppSelector(
+    (state) => state.androidPermissions
+  );
+  
+  if (initialLoad) {
+    return <LoadingScreen />;
+  }
+  
+  if (!permissionsGranted) {
+    return <NoAndroidPermissions />;
+  }
+  
+  return <>{children}</>;
+};
+```
+
+### Notification Permission (DFU)
+
+For Device Firmware Updates, request notification permission:
+
+```typescript
+// From src/navigation/screens/DfuScreen.tsx
+
+const requestNotificationPermission = async () => {
+  if (Platform.OS === 'android' && Platform.Version >= 33) {
+    const granted = await PermissionsAndroid.request(
+      PermissionsAndroid.PERMISSIONS.POST_NOTIFICATIONS
+    );
+    
+    if (granted !== PermissionsAndroid.RESULTS.GRANTED) {
+      Alert.alert(
+        'Notification permission required',
+        'Please enable notifications to see DFU progress'
+      );
+      return false;
+    }
+  }
+  return true;
+};
+```
+
+## iOS Permissions
+
+### Info.plist Configuration
+
+Add permission descriptions to `ios/WildlifeWatcher/Info.plist`:
+
+```xml
+<key>NSBluetoothAlwaysUsageDescription</key>
+<string>This app uses BLE to communicate with Wildlife Watcher devices</string>
+
+<key>NSBluetoothPeripheralUsageDescription</key>
+<string>We need access to your bluetooth connection to connect to your devices and enable their remote configuration.</string>
+
+<key>NSLocationWhenInUseUsageDescription</key>
+<string>We need access to your location to show your position on the map.</string>
+```
+
+<Warning>
+  iOS will automatically reject your app if these descriptions are missing or not descriptive enough.
+</Warning>
+
+### iOS Permission Behavior
+
+iOS automatically prompts for permissions when first accessed. No manual permission request code is needed:
+
+```typescript
+if (Platform.OS === 'ios') {
+  // iOS handles permissions automatically
+  return true;
+}
+```
+
+## Permission Monitoring
+
+The app continuously monitors permission status to handle changes:
+
+### Android Permission Polling
+
+```typescript
+import { useInterval } from './useInterval';
+
+export const useAndroidPermissions = () => {
+  const dispatch = useAppDispatch();
+  
+  // Check permissions every 10 seconds
+  useInterval(
+    () => {
+      dispatch(permissionCheck());
+    },
+    1000 * 10,
+    true // Run immediately on mount
+  );
+  
+  // Request on initial mount
+  useEffect(() => {
+    dispatch(permissionRequest());
+  }, [dispatch]);
+};
+```
+
+### Location Status Monitoring
+
+Monitor GPS/location service status:
+
+```typescript
+import deviceInfoModule from 'react-native-device-info';
+
+export const useLocationStatus = () => {
+  const dispatch = useAppDispatch();
+  
+  const checkLocationService = async () => {
+    try {
+      const enabled = await deviceInfoModule.isLocationEnabled();
+      dispatch(updateLocationStatus(enabled));
+    } catch (error) {
+      console.error('Location check failed:', error);
+    }
+  };
+  
+  // Check every 3 seconds
+  useInterval(
+    () => {
+      checkLocationService();
+    },
+    1000 * 3,
+    true
+  );
+};
+```
+
+### Bluetooth Status Monitoring
+
+Monitor Bluetooth adapter status:
+
+```typescript
+import BluetoothStateManager from 'react-native-bluetooth-state-manager';
+
+export const useBluetoothStatus = () => {
+  const dispatch = useAppDispatch();
+  
+  useEffect(() => {
+    // Listen for Bluetooth state changes
+    const subscription = BluetoothStateManager.onStateChange(
+      (bluetoothState) => {
+        console.log(`BLE is currently: ${bluetoothState}`);
+        dispatch(updateBluetoothStatus(bluetoothState));
+      },
+      true // Emit current state immediately
+    );
+    
+    return () => subscription.remove();
+  }, [dispatch]);
+};
+```
+
+Bluetooth states include:
+- `Unknown`
+- `Resetting`
+- `Unsupported`
+- `Unauthorized`
+- `PoweredOff`
+- `PoweredOn`
+
+## Permission UI Components
+
+### No Permissions Screen
+
+When permissions are denied, show instructions:
+
+```typescript
+function NoAndroidPermissions() {
+  const { neverAskAgain } = useAppSelector(
+    (state) => state.androidPermissions
+  );
+  
+  const openSettings = () => {
+    if (Platform.OS === 'android') {
+      Linking.openSettings();
+    }
+  };
+  
+  return (
+    <View>
+      <Text>Permissions Required</Text>
+      
+      {neverAskAgain.length > 0 ? (
+        <>
+          <Text>
+            You have permanently denied some permissions.
+            Please enable them in system settings.
+          </Text>
+          <Button onPress={openSettings}>Open Settings</Button>
+        </>
+      ) : (
+        <>
+          <Text>
+            This app requires Bluetooth and Location permissions
+            to connect to Wildlife Watcher devices.
+          </Text>
+          <Button onPress={requestPermissions}>Grant Permissions</Button>
+        </>
+      )}
+    </View>
+  );
+}
+```
+
+## Required Permissions by Feature
+
+<Accordion title="BLE Device Scanning">
+  **Android 12+:**
+  - `BLUETOOTH_SCAN`
+  - `ACCESS_FINE_LOCATION` (for scanning)
+  
+  **Android 11 and below:**
+  - `BLUETOOTH`
+  - `BLUETOOTH_ADMIN`
+  - `ACCESS_FINE_LOCATION`
+  
+  **iOS:**
+  - `NSBluetoothAlwaysUsageDescription`
+  - `NSBluetoothPeripheralUsageDescription`
+</Accordion>
+
+<Accordion title="BLE Device Connection">
+  **Android 12+:**
+  - `BLUETOOTH_CONNECT`
+  
+  **Android 11 and below:**
+  - `BLUETOOTH`
+  - `BLUETOOTH_ADMIN`
+  
+  **iOS:**
+  - Automatically handled
+</Accordion>
+
+<Accordion title="Location/Maps">
+  **Android:**
+  - `ACCESS_FINE_LOCATION`
+  
+  **iOS:**
+  - `NSLocationWhenInUseUsageDescription`
+</Accordion>
+
+<Accordion title="Device Firmware Updates">
+  **Android:**
+  - `POST_NOTIFICATIONS` (API 33+)
+  - `FOREGROUND_SERVICE`
+  - `FOREGROUND_SERVICE_CONNECTED_DEVICE`
+  
+  **iOS:**
+  - No additional permissions needed
+</Accordion>
+
+## Testing Permissions
+
+Test permission flows in development:
+
+### Reset Permissions (Android)
+
+```bash
+# Reset all permissions for your app
+adb shell pm reset-permissions com.wildlifewatcher
+
+# Or clear app data
+adb shell pm clear com.wildlifewatcher
+```
+
+### Reset Permissions (iOS)
+
+```bash
+# Reset privacy settings
+xcrun simctl privacy booted reset all com.wildlife.watcher
+
+# Or reset all simulator data
+xcrun simctl erase all
+```
+
+## Permission State Types
+
+```typescript
+interface AndroidPermissionsState {
+  permissionsGranted: boolean;
+  neverAskAgain: string[];
+  loading: boolean;
+  initialLoad: boolean;
+  error?: Error;
+}
+
+interface LocationStatusState {
+  enabled: boolean;
+  loading: boolean;
+  error?: string;
+}
+
+interface BluetoothStatusState {
+  status: BluetoothState;
+  initialLoad: boolean;
+}
+```
+
+## Best Practices
+
+<Warning>
+  **Important Permission Guidelines**
+</Warning>
+
+1. **Request at the Right Time**: Only request permissions when the feature is needed, not on app startup.
+
+2. **Provide Context**: Explain why permissions are needed before requesting them.
+
+3. **Handle Denial Gracefully**: Provide clear instructions when permissions are denied.
+
+4. **Monitor Changes**: Continuously check permission status as users can revoke them anytime.
+
+5. **Test on Real Devices**: Permission behavior differs between emulators and real devices.
+
+## Common Issues
+
+See the [Troubleshooting Guide](/guides/troubleshooting) for solutions to common permission-related issues.
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Configuration" icon="gear" href="/guides/configuration">
+    Configure environment variables and API settings
+  </Card>
+  <Card title="Troubleshooting" icon="wrench" href="/guides/troubleshooting">
+    Fix common BLE and permission issues
+  </Card>
+</CardGroup>

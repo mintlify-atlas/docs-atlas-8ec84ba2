@@ -1,0 +1,199 @@
+---
+title: API Overview
+description: Learn about the Wildlife Watcher API architecture using RTK Query
+---
+
+## Introduction
+
+The Wildlife Watcher mobile app uses [RTK Query](https://redux-toolkit.js.org/rtk-query/overview) for efficient data fetching and caching. RTK Query is built on top of Redux Toolkit and provides a powerful set of tools for managing server state in React applications.
+
+## Architecture
+
+### Base API Setup
+
+All API endpoints are built on a centralized base API configuration defined in `src/redux/api/index.ts`:
+
+```typescript
+import { createApi } from "@reduxjs/toolkit/query/react"
+import { extendedBaseQuery } from "./fetch"
+
+const TAG_TYPES = [
+  "User",
+  "Device",
+  "Media",
+  "Observation",
+  "Project",
+  "SensorRecord",
+  "Deployment",
+  "ApiLog",
+] as const
+
+export const api = createApi({
+  reducerPath: "api",
+  baseQuery: extendedBaseQuery,
+  tagTypes: TAG_TYPES,
+  endpoints: () => ({}),
+})
+```
+
+### Tag-Based Cache Invalidation
+
+The API uses RTK Query's tag system for automatic cache invalidation:
+
+- **providesTags**: Marks cached data with tags when fetched
+- **invalidatesTags**: Automatically refetches data when tags are invalidated
+
+For example, when you create a new device, the `Device` list is automatically refetched.
+
+## Common Patterns
+
+### Query Hooks
+
+Query hooks are used for fetching data (GET requests):
+
+```typescript
+import { useGetDevicesQuery } from '@/redux/api/devices'
+
+function DeviceList() {
+  const { data, isLoading, error } = useGetDevicesQuery()
+  
+  if (isLoading) return <Loading />
+  if (error) return <Error error={error} />
+  
+  return (
+    <>
+      {data?.map(device => (
+        <DeviceCard key={device.id} device={device} />
+      ))}
+    </>
+  )
+}
+```
+
+### Mutation Hooks
+
+Mutation hooks are used for creating, updating, or deleting data:
+
+```typescript
+import { useCreateDeviceMutation } from '@/redux/api/devices'
+
+function CreateDevice() {
+  const [createDevice, { isLoading }] = useCreateDeviceMutation()
+  
+  const handleSubmit = async (formData) => {
+    try {
+      const result = await createDevice(formData).unwrap()
+      console.log('Device created:', result)
+    } catch (error) {
+      console.error('Failed to create device:', error)
+    }
+  }
+  
+  return <DeviceForm onSubmit={handleSubmit} />
+}
+```
+
+### Polling for Real-Time Updates
+
+RTK Query supports automatic polling to keep data fresh:
+
+```typescript
+const { data } = useGetDeploymentsQuery(undefined, {
+  pollingInterval: 30000, // Poll every 30 seconds
+})
+```
+
+### Conditional Fetching
+
+Skip queries until certain conditions are met:
+
+```typescript
+const { data } = useGetDeviceByIdQuery(deviceId, {
+  skip: !deviceId, // Don't fetch until deviceId is available
+})
+```
+
+## Response Structure
+
+### Standard Response
+
+Most endpoints return data in a wrapped format:
+
+```typescript
+type ApiResponse<T> = {
+  data: T
+  success: boolean
+  error?: BaseResponse
+}
+```
+
+### Paginated Response
+
+For endpoints that return lists with pagination:
+
+```typescript
+type PaginatedResponse<T> = {
+  data: T[]
+  total: number
+  page: number
+  limit: number
+}
+```
+
+## Error Handling
+
+All API errors follow this structure:
+
+```typescript
+type BaseResponse = {
+  code: number
+  message: string
+  type?: string
+  details?: string
+}
+```
+
+Handle errors in your components:
+
+```typescript
+const { data, error } = useGetProjectsQuery()
+
+if (error) {
+  if ('status' in error) {
+    // HTTP error
+    const errMsg = 'error' in error ? error.error : JSON.stringify(error.data)
+    return <div>Error: {errMsg}</div>
+  } else {
+    // Network error
+    return <div>Error: {error.message}</div>
+  }
+}
+```
+
+## API Modules
+
+The API is organized into the following modules:
+
+- [Authentication](/api/auth) - User login and registration
+- [Devices](/api/devices) - Camera trap device management
+- [Projects](/api/projects) - Research project management
+- [Deployments](/api/deployments) - Device deployment tracking
+- [Observations](/api/observations) - Wildlife observation records
+- [Media](/api/media) - Image and video file management
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Authentication" icon="key" href="/api/auth">
+    Learn how to authenticate users
+  </Card>
+  <Card title="Devices" icon="camera" href="/api/devices">
+    Manage camera trap devices
+  </Card>
+  <Card title="Projects" icon="folder" href="/api/projects">
+    Organize research projects
+  </Card>
+  <Card title="Deployments" icon="map-pin" href="/api/deployments">
+    Track device deployments
+  </Card>
+</CardGroup>

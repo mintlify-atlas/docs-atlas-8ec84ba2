@@ -1,0 +1,377 @@
+---
+title: 'Layout Components'
+description: 'Structural components for organizing screen content'
+---
+
+## WWScreenView
+
+A root screen container that handles scrolling, keyboard interactions, and safe area insets. Use this as the main container for all screens in your app.
+
+### Props
+
+<ParamField path="scrollable" type="boolean" default="true">
+  When true, wraps content in a ScrollView. Set to false for static screens
+</ParamField>
+
+<ParamField path="children" type="React.ReactNode" required>
+  Content to display within the screen
+</ParamField>
+
+<ParamField path="style" type="StyleProp<ViewStyle>">
+  Custom styles applied to the content container
+</ParamField>
+
+### Type Definition
+
+```tsx
+type Props = PropsWithChildren<ViewProps | ScrollViewProps> & {
+  scrollable?: boolean
+}
+```
+
+### Features
+
+- **Automatic Safe Area Handling**: Applies safe area insets for top and bottom edges
+- **Keyboard Dismissal**: Tap anywhere to dismiss the keyboard
+- **Theme Integration**: Uses `appPadding` from theme for consistent spacing
+- **ScrollView Support**: Configurable scrolling with `keyboardShouldPersistTaps="handled"`
+
+### Usage Examples
+
+<Tabs>
+  <Tab title="Scrollable Screen">
+    ```tsx
+import { WWScreenView } from '@/components/ui'
+import { WWText, WWButton } from '@/components/ui'
+
+export const ObservationScreen = () => {
+  return (
+    <WWScreenView>
+      <WWText variant="headlineMedium" gutter>
+        Wildlife Observation
+      </WWText>
+      <WWText gutter>
+        Record your wildlife sightings and contribute to conservation efforts.
+      </WWText>
+      <WWButton mode="contained">
+        New Observation
+      </WWButton>
+    </WWScreenView>
+  )
+}
+    ```
+  </Tab>
+  
+  <Tab title="Static Screen">
+    ```tsx
+import { WWScreenView } from '@/components/ui'
+import { WWText } from '@/components/ui'
+import { View, StyleSheet } from 'react-native'
+
+export const MapScreen = () => {
+  return (
+    <WWScreenView scrollable={false}>
+      <WWText variant="headlineMedium">
+        Observation Map
+      </WWText>
+      <View style={styles.mapContainer}>
+        {/* Map component here */}
+      </View>
+    </WWScreenView>
+  )
+}
+
+const styles = StyleSheet.create({
+  mapContainer: {
+    flex: 1,
+    marginTop: 16,
+  },
+})
+    ```
+  </Tab>
+  
+  <Tab title="Form Screen">
+    ```tsx
+import { WWScreenView } from '@/components/ui'
+import { WWTextInput, WWSelect, WWButton } from '@/components/ui'
+import { useState } from 'react'
+
+export const ObservationFormScreen = () => {
+  const [species, setSpecies] = useState('')
+  const [location, setLocation] = useState('')
+  
+  return (
+    <WWScreenView>
+      <WWTextInput
+        label="Species Name"
+        value={species}
+        onChange={setSpecies}
+      />
+      <WWTextInput
+        label="Location"
+        value={location}
+        onChange={setLocation}
+      />
+      <WWButton mode="contained" onPress={() => {}}>
+        Submit Observation
+      </WWButton>
+    </WWScreenView>
+  )
+}
+    ```
+  </Tab>
+  
+  <Tab title="Custom Styling">
+    ```tsx
+import { WWScreenView } from '@/components/ui'
+import { StyleSheet } from 'react-native'
+
+export const CustomStyledScreen = () => {
+  return (
+    <WWScreenView style={styles.container}>
+      {/* Content */}
+    </WWScreenView>
+  )
+}
+
+const styles = StyleSheet.create({
+  container: {
+    backgroundColor: '#f5f5f5',
+  },
+})
+    ```
+  </Tab>
+</Tabs>
+
+---
+
+## WWScrollView
+
+A flexible scroll container with gesture handler support. Use this for scrollable regions within a screen.
+
+### Props
+
+<ParamField path="children" type="React.ReactNode" required>
+  Content to display within the scroll view
+</ParamField>
+
+<ParamField path="containerStyle" type="StyleProp<ViewStyle>">
+  Custom styles for the inner content container
+</ParamField>
+
+<ParamField path="style" type="StyleProp<ViewStyle>">
+  Custom styles for the ScrollView itself
+</ParamField>
+
+<ParamField path="horizontal" type="boolean" default="false">
+  Enables horizontal scrolling
+</ParamField>
+
+<ParamField path="showsVerticalScrollIndicator" type="boolean" default="true">
+  Shows/hides the vertical scroll indicator
+</ParamField>
+
+<ParamField path="showsHorizontalScrollIndicator" type="boolean" default="true">
+  Shows/hides the horizontal scroll indicator
+</ParamField>
+
+### Type Definition
+
+```tsx
+type Props = ScrollViewProps & {
+  containerStyle?: StyleProp<ViewStyle>
+}
+```
+
+### Features
+
+- **Gesture Handler Integration**: Uses `react-native-gesture-handler` for smooth scrolling
+- **Ref Support**: Forwards refs for imperative scroll control
+- **Responder Support**: Inner view handles touch responders for nested interactions
+
+### Usage Examples
+
+<Tabs>
+  <Tab title="Vertical List">
+    ```tsx
+import { WWScrollView } from '@/components/ui'
+import { WWText } from '@/components/ui'
+import { StyleSheet } from 'react-native'
+
+export const SpeciesList = () => {
+  const species = ['Red Fox', 'Gray Wolf', 'Black Bear', 'Bald Eagle']
+  
+  return (
+    <WWScrollView containerStyle={styles.container}>
+      {species.map(name => (
+        <WWText key={name} gutter>
+          {name}
+        </WWText>
+      ))}
+    </WWScrollView>
+  )
+}
+
+const styles = StyleSheet.create({
+  container: {
+    padding: 16,
+  },
+})
+    ```
+  </Tab>
+  
+  <Tab title="Horizontal Gallery">
+    ```tsx
+import { WWScrollView } from '@/components/ui'
+import { Image, StyleSheet, View } from 'react-native'
+
+export const PhotoGallery = ({ photos }) => {
+  return (
+    <WWScrollView 
+      horizontal
+      showsHorizontalScrollIndicator={false}
+      containerStyle={styles.gallery}
+    >
+      {photos.map((photo, index) => (
+        <Image
+          key={index}
+          source={{ uri: photo.url }}
+          style={styles.photo}
+        />
+      ))}
+    </WWScrollView>
+  )
+}
+
+const styles = StyleSheet.create({
+  gallery: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  photo: {
+    width: 200,
+    height: 150,
+    borderRadius: 8,
+  },
+})
+    ```
+  </Tab>
+  
+  <Tab title="With Ref">
+    ```tsx
+import { WWScrollView } from '@/components/ui'
+import { WWButton } from '@/components/ui'
+import { useRef } from 'react'
+import { ScrollView } from 'react-native-gesture-handler'
+
+export const ScrollControlExample = () => {
+  const scrollRef = useRef<ScrollView>(null)
+  
+  const scrollToTop = () => {
+    scrollRef.current?.scrollTo({ y: 0, animated: true })
+  }
+  
+  return (
+    <>
+      <WWScrollView ref={scrollRef}>
+        {/* Long content */}
+      </WWScrollView>
+      <WWButton onPress={scrollToTop}>
+        Scroll to Top
+      </WWButton>
+    </>
+  )
+}
+    ```
+  </Tab>
+  
+  <Tab title="Nested in Screen">
+    ```tsx
+import { WWScreenView, WWScrollView } from '@/components/ui'
+import { WWText } from '@/components/ui'
+import { StyleSheet, View } from 'react-native'
+
+export const NestedScrollScreen = () => {
+  return (
+    <WWScreenView scrollable={false}>
+      <WWText variant="headlineMedium">
+        Observation Details
+      </WWText>
+      
+      <View style={styles.section}>
+        <WWText variant="titleMedium">Photos</WWText>
+        <WWScrollView 
+          horizontal
+          style={styles.photoScroll}
+        >
+          {/* Photo items */}
+        </WWScrollView>
+      </View>
+      
+      <View style={styles.section}>
+        <WWText variant="titleMedium">Notes</WWText>
+        <WWText>Detailed observation notes...</WWText>
+      </View>
+    </WWScreenView>
+  )
+}
+
+const styles = StyleSheet.create({
+  section: {
+    marginVertical: 16,
+  },
+  photoScroll: {
+    marginTop: 8,
+  },
+})
+    ```
+  </Tab>
+</Tabs>
+
+## Implementation Details
+
+### Source Code Locations
+
+- **WWScreenView**: `/workspace/source/src/components/ui/WWScreenView.tsx:18-53`
+- **WWScrollView**: `/workspace/source/src/components/ui/WWScrollView.tsx:15-25`
+
+### WWScreenView Behavior
+
+When `scrollable={true}` (default):
+- Wraps content in `ScrollView`
+- Applies `keyboardShouldPersistTaps="handled"` for better form UX
+- Sets `minHeight: 100%` on content container
+- Adds bottom padding based on safe area insets
+
+When `scrollable={false}`:
+- Wraps content in `View`
+- Uses `flex: 1` for full-screen layout
+- Still applies safe area padding
+
+### Keyboard Handling
+
+Both components work together for optimal keyboard behavior:
+
+```tsx
+import { WWScreenView } from '@/components/ui'
+import { WWTextInput, WWButton } from '@/components/ui'
+
+// Keyboard automatically dismisses on tap outside
+// ScrollView adjusts to keep focused input visible
+export const FormScreen = () => {
+  return (
+    <WWScreenView>
+      <WWTextInput label="Field 1" />
+      <WWTextInput label="Field 2" />
+      <WWTextInput label="Field 3" />
+      <WWButton>Submit</WWButton>
+    </WWScreenView>
+  )
+}
+```
+
+### Performance Considerations
+
+- Use `scrollable={false}` for screens with maps or heavy graphics
+- Use `WWScrollView` for horizontal lists instead of `FlatList` when the number of items is small
+- Consider `FlatList` or `FlashList` for large vertical lists instead of `WWScrollView`

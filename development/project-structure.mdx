@@ -1,0 +1,163 @@
+---
+title: 'Project Structure'
+description: 'Overview of the Wildlife Watcher mobile app codebase architecture and organization'
+---
+
+## Overview
+
+The Wildlife Watcher mobile app is built with React Native and follows a modular architecture pattern. The codebase is organized into logical directories that separate concerns and promote code reusability.
+
+## Directory Structure
+
+The application source code is located in the `src/` directory with the following structure:
+
+```bash
+src/
+├── assets/           # Images, fonts, and other static resources
+├── ble/              # Bluetooth Low Energy functionality
+├── components/       # Reusable UI components
+│   ├── form/         # Form-specific components
+│   └── ui/           # Base UI components (buttons, inputs, etc.)
+├── hooks/            # Custom React hooks
+├── navigation/       # Navigation configuration and screens
+│   └── screens/      # Screen components
+├── providers/        # React context providers
+├── redux/            # State management
+│   ├── api/          # RTK Query API endpoints
+│   └── slices/       # Redux slices
+├── services/         # Business logic and external services
+├── types/            # TypeScript type definitions
+├── utils/            # Utility functions and helpers
+├── App.tsx           # Root application component
+└── theme.ts          # Theme configuration
+```
+
+## Core Directories
+
+### Components (`src/components/`)
+
+Contains all reusable UI components organized into subdirectories:
+
+- **`ui/`**: Base UI components like `WWButton`, `WWText`, `WWTextInput`, etc.
+- **`form/`**: Form-specific components like `Field`
+- Root level: Feature-specific components like `DeploymentCard`, `DeviceItem`, `NavigationBar`
+
+<Tip>
+All custom UI components are prefixed with `WW` (Wildlife Watcher) to distinguish them from third-party components.
+</Tip>
+
+### Navigation (`src/navigation/`)
+
+Contains navigation configuration using React Navigation:
+
+- **`index.tsx`**: Main navigation setup with stack navigator
+- **`BottomTabs.tsx`**: Bottom tab navigation configuration
+- **`screens/`**: All screen components organized by feature
+
+### Redux (`src/redux/`)
+
+State management is centralized here:
+
+- **`index.ts`**: Store configuration and setup
+- **`slices/`**: Redux Toolkit slices for local state
+- **`api/`**: RTK Query API endpoints organized by resource
+
+### Hooks (`src/hooks/`)
+
+Custom React hooks for shared functionality:
+
+- `useBle.ts`: Bluetooth Low Energy operations
+- `useAppNavigation.tsx`: Navigation helpers
+- `useAndroidPermissions.ts`: Permission management
+- And more specialized hooks
+
+### Providers (`src/providers/`)
+
+React context providers for global state and functionality:
+
+- `AndroidPermissionsProvider`
+- `BleEngineProvider`
+- `AuthProvider`
+- `AppSetupProvider`
+
+### BLE (`src/ble/`)
+
+Bluetooth Low Energy specific functionality:
+
+- `parser.ts`: BLE data parsing utilities
+- `types.ts`: BLE-related type definitions
+
+## Application Entry Point
+
+The `App.tsx` file serves as the root component and wraps the application with necessary providers:
+
+```tsx src/App.tsx
+import { SafeAreaProvider } from "react-native-safe-area-context"
+import { Provider as ReduxProvider } from "react-redux"
+import { NavigationContainer } from "@react-navigation/native"
+import { PaperProvider } from "react-native-paper"
+
+export const App = () => {
+  return (
+    <SafeAreaProvider>
+      <Suspense fallback={"Loading..."}>
+        <ReduxProvider store={store}>
+          <PaperProvider theme={CombinedDefaultTheme}>
+            <NavigationContainer theme={CombinedDefaultTheme}>
+              <AndroidPermissionsProvider>
+                <AppSetupProvider>
+                  <BleEngineProvider>
+                    <ListenToBleEngineProvider>
+                      <AuthProvider>
+                        <MainNavigation />
+                      </AuthProvider>
+                    </ListenToBleEngineProvider>
+                  </BleEngineProvider>
+                </AppSetupProvider>
+              </AndroidPermissionsProvider>
+            </NavigationContainer>
+          </PaperProvider>
+        </ReduxProvider>
+      </Suspense>
+    </SafeAreaProvider>
+  )
+}
+```
+
+<Note>
+The provider hierarchy is important - Redux must wrap navigation, and permission providers must wrap the BLE engine.
+</Note>
+
+## Key Technologies
+
+- **React Native**: Cross-platform mobile framework
+- **TypeScript**: Type-safe JavaScript
+- **Redux Toolkit**: State management
+- **RTK Query**: Data fetching and caching
+- **React Navigation**: Navigation library
+- **React Native Paper**: UI component library
+- **React Native BLE Manager**: Bluetooth functionality
+
+## File Naming Conventions
+
+- Components: PascalCase (e.g., `DeploymentCard.tsx`)
+- Hooks: camelCase with `use` prefix (e.g., `useBle.ts`)
+- Utilities: camelCase (e.g., `helpers.ts`)
+- Types: PascalCase for interfaces/types (e.g., `ExtendedPeripheral`)
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="State Management" icon="store" href="./state-management">
+    Learn about Redux slices and state organization
+  </Card>
+  <Card title="API Integration" icon="plug" href="./api-integration">
+    Understand RTK Query usage and API endpoints
+  </Card>
+  <Card title="Navigation" icon="compass" href="./navigation">
+    Explore navigation setup and screen routing
+  </Card>
+  <Card title="Components" icon="puzzle-piece" href="../ui/components">
+    Browse available UI components
+  </Card>
+</CardGroup>

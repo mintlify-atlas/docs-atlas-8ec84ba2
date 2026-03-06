@@ -1,0 +1,361 @@
+---
+title: 'Permission Hooks'
+description: 'Monitor and request Android permissions, location services, and Bluetooth status'
+---
+
+## Overview
+
+The Wildlife Watcher app uses three hooks to monitor system permissions and services required for BLE functionality:
+- `useAndroidPermissions` - Manages Android runtime permissions
+- `useLocationStatus` - Monitors location service status
+- `useBluetoothStatus` - Tracks Bluetooth adapter state
+
+---
+
+## useAndroidPermissions
+
+Automatically requests and monitors Android runtime permissions required for BLE operations.
+
+### Import
+
+```typescript
+import { useAndroidPermissions } from '../hooks/useAndroidPermissions'
+```
+
+### Usage
+
+```typescript
+import { useAndroidPermissions } from '../hooks/useAndroidPermissions'
+
+const AndroidPermissionsProvider = ({ children }) => {
+  useAndroidPermissions()
+  
+  const { initialLoad, permissionsGranted } = useAppSelector(
+    (state) => state.androidPermissions
+  )
+  
+  if (initialLoad) {
+    return <LoadingScreen />
+  }
+  
+  if (!permissionsGranted) {
+    return <PermissionsRequestScreen />
+  }
+  
+  return <>{children}</>
+}
+```
+
+### Behavior
+
+- Automatically requests permissions on mount
+- Checks permission status every **10 seconds**
+- Dispatches Redux actions to update permission state
+- No parameters or return values (manages state via Redux)
+
+### Redux State
+
+Access permission state from the Redux store:
+
+```typescript
+const { initialLoad, permissionsGranted } = useAppSelector(
+  (state) => state.androidPermissions
+)
+
+// initialLoad: boolean - true during first permission check
+// permissionsGranted: boolean - true if all required permissions granted
+```
+
+### Required Permissions
+
+The hook manages these Android permissions:
+- `BLUETOOTH_SCAN`
+- `BLUETOOTH_CONNECT`
+- `ACCESS_FINE_LOCATION`
+- `ACCESS_COARSE_LOCATION`
+
+---
+
+## useLocationStatus
+
+Monitors the device's location service status, which is required for BLE scanning on Android.
+
+### Import
+
+```typescript
+import { useLocationStatus } from '../hooks/useLocationStatus'
+```
+
+### Usage
+
+```typescript
+import { useLocationStatus } from '../hooks/useLocationStatus'
+
+const AppSetupProvider = ({ children }) => {
+  useLocationStatus()
+  
+  const locationStatus = useAppSelector(
+    (state) => state.locationStatus
+  )
+  
+  if (!locationStatus.enabled) {
+    return <LocationDisabledWarning />
+  }
+  
+  return <>{children}</>
+}
+```
+
+### Behavior
+
+- Checks location service status every **3 seconds**
+- Uses `react-native-device-info` to detect location enabled state
+- Updates Redux store with current status
+- Handles errors gracefully
+
+### Redux State
+
+Access location status from the Redux store:
+
+```typescript
+const locationStatus = useAppSelector((state) => state.locationStatus)
+
+// Properties:
+// - enabled: boolean - true if location services are on
+// - loading: boolean - true while checking status
+// - error: string | undefined - error message if check failed
+```
+
+---
+
+## useBluetoothStatus
+
+Monitors the device's Bluetooth adapter state in real-time.
+
+### Import
+
+```typescript
+import { useBluetoothStatus } from '../hooks/useBluetoothStatus'
+```
+
+### Usage
+
+```typescript
+import { useBluetoothStatus } from '../hooks/useBluetoothStatus'
+import { BluetoothState } from 'react-native-bluetooth-state-manager'
+
+const AppSetupProvider = ({ children }) => {
+  const { status, initialLoad } = useBluetoothStatus()
+  
+  if (initialLoad) {
+    return <LoadingScreen />
+  }
+  
+  if (status !== BluetoothState.PoweredOn) {
+    return <BluetoothDisabledWarning status={status} />
+  }
+  
+  return <>{children}</>
+}
+```
+
+### Return Values
+
+<ResponseField name="status" type="BluetoothState">
+  Current Bluetooth adapter state. Possible values:
+  - `BluetoothState.Unknown`
+  - `BluetoothState.Resetting`
+  - `BluetoothState.Unsupported`
+  - `BluetoothState.Unauthorized`
+  - `BluetoothState.PoweredOff`
+  - `BluetoothState.PoweredOn`
+</ResponseField>
+
+<ResponseField name="initialLoad" type="boolean">
+  `true` during the first status check, `false` after initial state is determined
+</ResponseField>
+
+### Behavior
+
+- Subscribes to Bluetooth state changes using `BluetoothStateManager`
+- Updates state immediately when Bluetooth is turned on/off
+- Automatically cleans up listener on unmount
+- Triggers initial state check with `emitCurrentState: true`
+
+### Type Definition
+
+```typescript
+export type ReturnType = {
+  status: BluetoothState
+  initialLoad: boolean
+}
+
+export const useBluetoothStatus = (): ReturnType
+```
+
+---
+
+## Real-World Example
+
+From `AppSetupProvider.tsx`, using all three permission hooks:
+
+<CodeGroup>
+```typescript AppSetupProvider.tsx
+import { useBluetoothStatus } from '../hooks/useBluetoothStatus'
+import { useLocationStatus } from '../hooks/useLocationStatus'
+import { useSetupBLELibrary } from '../hooks/useSetupBLELibrary'
+
+/**
+ * Sets up different listeners and a basic permission layer
+ * so that the app can respond to system events.
+ */
+export const AppSetupProvider = ({ children }) => {
+  useSetupBLELibrary()
+  useBluetoothStatus()
+  useLocationStatus()
+  
+  return (
+    <>
+      {children}
+      <Toast position="bottom" />
+    </>
+  )
+}
+```
+
+```typescript AndroidPermissionsProvider.tsx
+import { useAndroidPermissions } from '../hooks/useAndroidPermissions'
+import { useAppSelector } from '../redux'
+
+/**
+ * We need to make sure permissions are checked and requested
+ * before any part of the app starts to load.
+ */
+export const AndroidPermissionsProvider = ({ children }) => {
+  useAndroidPermissions()
+  
+  const { initialLoad, permissionsGranted } = useAppSelector(
+    (state) => state.androidPermissions
+  )
+  
+  useEffect(() => {
+    const hideBootSplash = async () => {
+      if (!initialLoad && !permissionsGranted && await BootSplash.isVisible) {
+        BootSplash.hide({ fade: true })
+      }
+    }
+    hideBootSplash()
+  }, [permissionsGranted, initialLoad])
+  
+  if (initialLoad) {
+    return (
+      <View style={styles.loader}>
+        <ActivityIndicator size={30} />
+      </View>
+    )
+  }
+  
+  if (!permissionsGranted) {
+    return (
+      <Stack.Navigator initialRouteName="AndroidPermissions">
+        <Stack.Screen
+          name="AndroidPermissions"
+          component={NoAndroidPermissions}
+          options={{ headerShown: false }}
+        />
+      </Stack.Navigator>
+    )
+  }
+  
+  return <>{children}</>
+}
+```
+
+```typescript Checking Status
+import { BluetoothState } from 'react-native-bluetooth-state-manager'
+
+const DeviceScanner = () => {
+  const { status } = useBluetoothStatus()
+  const locationStatus = useAppSelector((state) => state.locationStatus)
+  const { permissionsGranted } = useAppSelector(
+    (state) => state.androidPermissions
+  )
+  
+  const canScan = 
+    status === BluetoothState.PoweredOn &&
+    locationStatus.enabled &&
+    permissionsGranted
+  
+  if (!canScan) {
+    return (
+      <View>
+        {status !== BluetoothState.PoweredOn && (
+          <Text>Please enable Bluetooth</Text>
+        )}
+        {!locationStatus.enabled && (
+          <Text>Please enable Location Services</Text>
+        )}
+        {!permissionsGranted && (
+          <Text>Please grant required permissions</Text>
+        )}
+      </View>
+    )
+  }
+  
+  return <DeviceScannerUI />
+}
+```
+</CodeGroup>
+
+## Permission Flow
+
+The typical permission check flow in the app:
+
+1. **App Start** → `AndroidPermissionsProvider` mounts
+2. **useAndroidPermissions** requests permissions
+3. **Initial Load** → Show loading screen while checking
+4. **Not Granted** → Show permission request screen
+5. **Granted** → Continue to main app
+6. **AppSetupProvider** mounts
+7. **useBluetoothStatus** + **useLocationStatus** start monitoring
+8. **Continuous Monitoring** → Redux state updates on changes
+9. **UI Reacts** → Show warnings/errors if services disabled
+
+## Redux State Structure
+
+```typescript
+// Redux state for permission hooks
+state = {
+  androidPermissions: {
+    initialLoad: boolean
+    permissionsGranted: boolean
+  },
+  locationStatus: {
+    enabled: boolean
+    loading: boolean
+    error?: string
+  },
+  blStatus: {
+    status: BluetoothState
+    initialLoad: boolean
+  }
+}
+```
+
+## Platform Notes
+
+### Android
+- All three hooks are critical for BLE functionality
+- Location permission required for BLE scanning (Android 6.0+)
+- Location services must be enabled even with permission granted
+- Bluetooth permission required (Android 12+ uses new permissions)
+
+### iOS
+- `useAndroidPermissions` only runs on Android
+- Bluetooth permissions handled differently (Info.plist)
+- Location services work differently but still monitored
+
+## Related
+
+- [useBle](/api/hooks/use-ble) - Core BLE functionality requiring these permissions
+- [Redux Slices](../redux/slices) - State management for permissions

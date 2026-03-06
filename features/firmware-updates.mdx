@@ -1,0 +1,610 @@
+---
+title: Firmware Updates
+description: Updating device firmware using Device Firmware Update (DFU) over BLE
+---
+
+## Overview
+
+The Wildlife Watcher app supports over-the-air (OTA) firmware updates for field devices using Nordic Semiconductor's Device Firmware Update (DFU) protocol. The DFU process allows users to update device firmware via Bluetooth Low Energy without physical access to device programming interfaces.
+
+## DFU Architecture
+
+The firmware update system consists of:
+
+- **DFU Service**: Wrapper around `react-native-nordic-dfu` library
+- **File Picker**: Allows users to select firmware ZIP files
+- **Progress Tracking**: Real-time update progress feedback
+- **Permission Handling**: Manages required Android/iOS permissions
+
+## DFU Service
+
+The core service handles the firmware update process:
+
+```typescript src/services/DfuService.ts
+import { NordicDFU, DFUEmitter } from 'react-native-nordic-dfu';
+
+export class DfuService {
+  static async startDFU(
+    deviceAddress: string,
+    firmwareFilePath: string,
+    onProgress?: (progress: number) => void
+  ) {
+    try {
+      // Set up progress listener
+      DFUEmitter.addListener('DFUProgress', (update) => {
+        onProgress?.(update.percent || 0);
+      });
+
+      const result = await NordicDFU.startDFU({
+        deviceAddress,
+        filePath: firmwareFilePath,
+        alternativeAdvertisingNameEnabled: false
+      });
+
+      // Clean up listener
+      DFUEmitter.removeAllListeners('DFUProgress');
+
+      return result;
+    } catch (error) {
+      console.error('DFU failed:', error);
+      // Clean up listener on error too
+      DFUEmitter.removeAllListeners('DFUProgress');
+      throw error;
+    }
+  }
+}
+```
+
+### DFU Configuration Options
+
+| Option | Type | Description |
+|--------|------|-------------|
+| `deviceAddress` | string | BLE MAC address of target device |
+| `filePath` | string | Local path to firmware ZIP file |
+| `alternativeAdvertisingNameEnabled` | boolean | Use alternative name during DFU (default: false) |
+
+## DFU Screen Implementation
+
+The DFU screen guides users through the firmware update process:
+
+```typescript src/navigation/screens/DfuScreen.tsx
+import React, { useState } from 'react';
+import { Platform, PermissionsAndroid } from 'react-native';
+import DocumentPicker from 'react-native-document-picker';
+import RNFS from 'react-native-fs';
+import { DfuService } from '../../services/DfuService';
+import { WWProgressBar } from '../../components/ui/WWProgressBar';
+import { WWButton } from '../../components/ui/WWButton';
+
+export const DfuScreen = () => {
+  const [fileName, setFileName] = useState<string>();
+  const [dfuProgress, setDfuProgress] = useState(0);
+  const [dfuError, setDfuError] = useState<string>();
+  const route = useRoute<AppParams<'DfuScreen'>>();
+  const { deviceId } = route.params;
+  const device = useSelectDevice({ deviceId });
+  
+  const isUpdating = dfuProgress > 0 && dfuProgress < 100;
+
+  const handleFilePick = async () => {
+    try {
+      // Request notification permission on Android
+      if (Platform.OS === 'android') {
+        const granted = await PermissionsAndroid.request(
+          PermissionsAndroid.PERMISSIONS.POST_NOTIFICATIONS,
+          {
+            title: 'Notification Permission',
+            message: 'App needs notification permission for firmware updates',
+            buttonPositive: 'OK'
+          }
+        );
+        
+        if (granted !== PermissionsAndroid.RESULTS.GRANTED) {
+          throw new Error('Notification permission required for DFU updates');
+        }
+      }
+
+      // Pick firmware file
+      const result = await DocumentPicker.pick({
+        type: Platform.select({
+          ios: ['public.archive'],
+          android: [DocumentPicker.types.allFiles]
+        })
+      });
+
+      setFileName(result[0].name || 'Unknown file');
+
+      // Copy file to cache directory on Android
+      const timestamp = Date.now();
+      const localPath = Platform.select({
+        ios: result[0].uri,
+        android: `${RNFS.CachesDirectoryPath}/firmware_${timestamp}.zip`
+      });
+
+      if (Platform.OS === 'android') {
+        await RNFS.copyFile(result[0].uri, localPath!);
+      }
+
+      // Start DFU process
+      try {
+        await DfuService.startDFU(
+          device.id,
+          localPath!,
+          (progress) => setDfuProgress(progress)
+        );
+
+        // Remove device from state after successful update
+        dispatch(removeDevice({ id: device.id }));
+        navigation.goBack();
+      } finally {
+        // Clean up temporary file
+        if (Platform.OS === 'android') {
+          await RNFS.unlink(localPath!).catch(console.error);
+        }
+      }
+    } catch (err) {
+      if (!DocumentPicker.isCancel(err)) {
+        console.error('DFU file pick failed:', err);
+        setDfuError(
+          err instanceof Error ? err.message : 'Unknown error occurred'
+        );
+      }
+    }
+  };
+
+  return (
+    <WWScreenView>
+      <View style={styles.container}>
+        <WWText variant="bodyMedium" style={styles.description}>
+          Select a firmware file to update your device. Make sure your device
+          stays connected during the update.
+        </WWText>
+
+        {fileName && (
+          <WWText variant="bodyMedium" style={styles.fileName}>
+            Selected file: {fileName}
+          </WWText>
+        )}
+
+        {dfuError && (
+          <WWText variant="bodyMedium" style={styles.error}>
+            Error: {dfuError}
+          </WWText>
+        )}
+
+        {isUpdating ? (
+          <WWProgressBar
+            progress={dfuProgress / 100}
+            showLabel
+            label={`Update progress: ${dfuProgress}%`}
+          />
+        ) : (
+          <WWButton
+            mode="contained"
+            onPress={handleFilePick}
+            style={styles.button}
+          >
+            Select Firmware File
+          </WWButton>
+        )}
+      </View>
+    </WWScreenView>
+  );
+};
+```
+
+## DFU Process Flow
+
+<Steps>
+
+<Step title="Enter DFU Mode">
+Send DFU command to device via BLE:
+
+```typescript
+import { CommandNames, CommandControlTypes } from '../ble/types';
+
+const enterDfuMode = async (device: ExtendedPeripheral) => {
+  const { write } = useBle();
+  
+  await write(device, [
+    [CommandNames.DFU, { control: CommandControlTypes.WRITE }]
+  ]);
+  
+  // Device will disconnect and enter DFU mode
+  // Response: "Device will enter DFU mode after disconnecting."
+};
+```
+</Step>
+
+<Step title="Device Disconnects">
+The device disconnects from BLE and enters DFU bootloader mode.
+</Step>
+
+<Step title="Select Firmware File">
+User selects a firmware ZIP file using the document picker.
+</Step>
+
+<Step title="Request Permissions">
+Android requires notification permission for DFU progress notifications.
+</Step>
+
+<Step title="Copy File to Cache">
+On Android, copy the firmware file to the app's cache directory for access.
+</Step>
+
+<Step title="Start DFU Transfer">
+Initiate the DFU process with the NordicDFU library:
+
+```typescript
+await NordicDFU.startDFU({
+  deviceAddress: device.id,
+  filePath: localFilePath,
+  alternativeAdvertisingNameEnabled: false
+});
+```
+</Step>
+
+<Step title="Monitor Progress">
+Track update progress via the DFUProgress event:
+
+```typescript
+DFUEmitter.addListener('DFUProgress', (update) => {
+  console.log(`Progress: ${update.percent}%`);
+  setProgress(update.percent);
+});
+```
+</Step>
+
+<Step title="Complete & Cleanup">
+After successful update, clean up temporary files and update Redux state.
+</Step>
+
+<Step title="Device Reboots">
+The device automatically reboots with the new firmware.
+</Step>
+
+</Steps>
+
+## Navigating to DFU Screen
+
+Users can initiate firmware updates from the device list:
+
+```typescript src/navigation/screens/Deployments.tsx
+import { useAppNavigation } from '../../hooks/useAppNavigation';
+import { DeviceItem } from '../../components/DeviceItem';
+
+const Deployments = () => {
+  const navigation = useAppNavigation();
+  
+  const handleUpgrade = useCallback(
+    (device: ExtendedPeripheral) => {
+      navigation.navigate('DfuScreen', { deviceId: device.id });
+    },
+    [navigation]
+  );
+
+  return (
+    <FlatList
+      data={devices}
+      renderItem={({ item }) => (
+        <DeviceItem
+          item={item}
+          upgrade={handleUpgrade}
+        />
+      )}
+    />
+  );
+};
+```
+
+## Firmware File Format
+
+Nordic DFU expects firmware files in a specific ZIP format:
+
+<CodeGroup>
+
+```text Firmware ZIP Structure
+firmware.zip
+├── manifest.json          # DFU metadata
+├── application.bin        # Application firmware binary
+├── application.dat        # Application init packet
+└── README.txt             # Optional readme
+```
+
+```json manifest.json
+{
+  "manifest": {
+    "application": {
+      "bin_file": "application.bin",
+      "dat_file": "application.dat"
+    }
+  }
+}
+```
+
+</CodeGroup>
+
+<Note>
+Firmware files must be generated using Nordic's nrfutil tool or compatible firmware packaging tools.
+</Note>
+
+## Progress Tracking
+
+The DFU process emits progress events:
+
+```typescript
+import { DFUEmitter } from 'react-native-nordic-dfu';
+
+const ProgressDisplay = () => {
+  const [progress, setProgress] = useState(0);
+  const [status, setStatus] = useState('Idle');
+
+  useEffect(() => {
+    const progressListener = DFUEmitter.addListener(
+      'DFUProgress',
+      (update) => {
+        setProgress(update.percent || 0);
+        
+        // DFU stages
+        if (update.percent === 0) {
+          setStatus('Connecting...');
+        } else if (update.percent < 25) {
+          setStatus('Preparing...');
+        } else if (update.percent < 100) {
+          setStatus('Uploading firmware...');
+        } else {
+          setStatus('Complete!');
+        }
+      }
+    );
+
+    return () => {
+      progressListener.remove();
+    };
+  }, []);
+
+  return (
+    <View>
+      <WWProgressBar progress={progress / 100} />
+      <WWText>{status} - {progress}%</WWText>
+    </View>
+  );
+};
+```
+
+## Error Handling
+
+```typescript
+import { Alert } from 'react-native';
+
+const handleDfuError = (error: any) => {
+  let message = 'Unknown error occurred';
+  
+  if (error.message?.includes('Device disconnected')) {
+    message = 'Device lost connection during update. Please try again.';
+  } else if (error.message?.includes('Invalid firmware')) {
+    message = 'The selected file is not a valid firmware package.';
+  } else if (error.message?.includes('Timeout')) {
+    message = 'Update timed out. Please ensure device is nearby.';
+  } else if (error instanceof Error) {
+    message = error.message;
+  }
+  
+  Alert.alert('Update Failed', message, [
+    { text: 'OK', style: 'default' }
+  ]);
+};
+
+try {
+  await DfuService.startDFU(deviceId, filePath, onProgress);
+} catch (error) {
+  handleDfuError(error);
+}
+```
+
+## Platform-Specific Considerations
+
+<Tabs>
+  <Tab title="Android">
+    ### Required Permissions
+    
+    ```xml AndroidManifest.xml
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <uses-permission android:name="android.permission.BLUETOOTH" />
+    <uses-permission android:name="android.permission.BLUETOOTH_ADMIN" />
+    <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
+    ```
+    
+    ### File Handling
+    
+    Files must be copied to cache directory:
+    
+    ```typescript
+    const localPath = `${RNFS.CachesDirectoryPath}/firmware_${Date.now()}.zip`;
+    await RNFS.copyFile(pickedFile.uri, localPath);
+    ```
+    
+    ### Notification Permission
+    
+    ```typescript
+    const granted = await PermissionsAndroid.request(
+      PermissionsAndroid.PERMISSIONS.POST_NOTIFICATIONS
+    );
+    ```
+  </Tab>
+  
+  <Tab title="iOS">
+    ### File Access
+    
+    iOS can use file URIs directly:
+    
+    ```typescript
+    const localPath = pickedFile.uri; // Use directly on iOS
+    ```
+    
+    ### Background Updates
+    
+    Configure background modes in Info.plist:
+    
+    ```xml Info.plist
+    <key>UIBackgroundModes</key>
+    <array>
+      <string>bluetooth-central</string>
+    </array>
+    ```
+    
+    ### File Type Selection
+    
+    ```typescript
+    await DocumentPicker.pick({
+      type: ['public.archive'] // iOS UTI for ZIP files
+    });
+    ```
+  </Tab>
+</Tabs>
+
+## Pre-Update Checklist
+
+Before starting a firmware update:
+
+<Steps>
+
+<Step title="Check Battery Level">
+Ensure device has sufficient battery (>30%):
+
+```typescript
+const { set, get } = useCommand({
+  deviceId,
+  command: COMMANDS.BATTERY
+});
+
+const batteryLevel = parseInt(deviceConfig?.BATTERY?.value || '0');
+
+if (batteryLevel < 30) {
+  Alert.alert(
+    'Low Battery',
+    'Device battery is low. Please charge before updating.'
+  );
+}
+```
+</Step>
+
+<Step title="Verify Firmware Version">
+Check current firmware version:
+
+```typescript
+const { set, get } = useCommand({
+  deviceId,
+  command: COMMANDS.VERSION
+});
+
+const currentVersion = deviceConfig?.VERSION?.value;
+console.log('Current version:', currentVersion);
+```
+</Step>
+
+<Step title="Stable Connection">
+Ensure strong signal (RSSI > -70):
+
+```typescript
+if (device.rssi && device.rssi < -70) {
+  Alert.alert(
+    'Weak Signal',
+    'Move closer to the device for a stable connection.'
+  );
+}
+```
+</Step>
+
+<Step title="User Warning">
+Warn user not to disconnect:
+
+```typescript
+Alert.alert(
+  'Important',
+  'Do not disconnect or move away from the device during the update. This process may take several minutes.',
+  [{ text: 'I Understand', onPress: startUpdate }]
+);
+```
+</Step>
+
+</Steps>
+
+## Best Practices
+
+<Card title="User Experience" icon="user">
+- Show clear progress indicators during updates
+- Prevent screen sleep during DFU process
+- Provide estimated time remaining
+- Allow users to cancel updates safely
+</Card>
+
+<Card title="Reliability" icon="shield-check">
+- Verify file integrity before starting DFU
+- Check battery level before updates
+- Implement retry logic for failed updates
+- Keep devices close during update (strong RSSI)
+</Card>
+
+<Card title="File Management" icon="file">
+- Clean up temporary files after updates
+- Validate firmware file format
+- Store firmware versions for rollback capability
+</Card>
+
+<Card title="Error Recovery" icon="triangle-exclamation">
+- Provide clear error messages
+- Log failures for debugging
+- Guide users on recovery steps
+- Support device reset if update fails
+</Card>
+
+## Troubleshooting
+
+### DFU Fails to Start
+
+```typescript
+// Ensure device is in DFU mode
+const enterDfuMode = async () => {
+  await write(device, [
+    [CommandNames.DFU, { control: CommandControlTypes.WRITE }]
+  ]);
+  
+  // Wait for device to disconnect and enter DFU mode
+  await new Promise(resolve => setTimeout(resolve, 3000));
+};
+```
+
+### Connection Lost During Update
+
+```typescript
+DFUEmitter.addListener('DFUStateChanged', (state) => {
+  if (state.state === 'disconnected') {
+    console.warn('Device disconnected during DFU');
+    // Attempt recovery or notify user
+  }
+});
+```
+
+### Invalid Firmware File
+
+```typescript
+const validateFirmware = async (filePath: string) => {
+  const exists = await RNFS.exists(filePath);
+  if (!exists) {
+    throw new Error('Firmware file not found');
+  }
+  
+  const stat = await RNFS.stat(filePath);
+  if (stat.size < 1024) {
+    throw new Error('Firmware file is too small to be valid');
+  }
+  
+  // Additional validation...
+};
+```
+
+## Related
+
+- [BLE Communication](/features/ble-communication) - Understanding BLE commands
+- [Device Management](/features/device-management) - Managing connected devices

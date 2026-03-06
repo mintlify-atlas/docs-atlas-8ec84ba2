@@ -1,0 +1,612 @@
+---
+title: Maps & Observations
+description: Visualizing deployments and recording wildlife observations in the Wildlife Watcher app
+---
+
+## Overview
+
+The Wildlife Watcher app provides interactive maps for visualizing deployment locations and recording wildlife observations. The maps feature integrates with GPS, deployment data, and the observation API.
+
+## Maps Screen
+
+The maps screen displays deployment locations on an interactive Google Maps component:
+
+```typescript src/navigation/screens/Maps.tsx
+import MapView, { Region, Marker, PROVIDER_GOOGLE } from 'react-native-maps';
+import { useGetDeploymentsQuery } from '../../redux/api/deployments';
+import { useAppSelector } from '../../redux';
+
+const Maps = () => {
+  const { data: deployments } = useGetDeploymentsQuery();
+  const { locationEnabled } = useAppSelector(state => state.locationStatus);
+  const mapRef = useRef<MapView>(null);
+  
+  const [region, setRegion] = useState<Region>({
+    latitude: -39.0556,
+    longitude: 174.0752,
+    latitudeDelta: 0.0922,
+    longitudeDelta: 0.0421
+  });
+
+  return (
+    <MapView
+      provider={PROVIDER_GOOGLE}
+      ref={mapRef}
+      style={styles.map}
+      region={region}
+      onRegionChange={setRegion}
+      showsUserLocation={locationEnabled}
+      showsMyLocationButton={false}
+    >
+      {deployments?.map((deployment) =>
+        deployment.latitude && deployment.longitude ? (
+          <Marker
+            key={deployment.id}
+            coordinate={{
+              latitude: deployment.latitude,
+              longitude: deployment.longitude
+            }}
+            title={deployment.locationName || `Deployment #${deployment.id.slice(-4)}`}
+            description={deployment.deploymentComments}
+          />
+        ) : null
+      )}
+    </MapView>
+  );
+};
+```
+
+## Map Components
+
+### Region Configuration
+
+The map region defines the visible area:
+
+```typescript
+type Region = {
+  latitude: number        // Center latitude
+  longitude: number       // Center longitude
+  latitudeDelta: number   // Vertical span (zoom level)
+  longitudeDelta: number  // Horizontal span (zoom level)
+}
+```
+
+<Tabs>
+  <Tab title="Default Region">
+    ```typescript
+    const [region, setRegion] = useState<Region>({
+      latitude: -39.0556,   // New Zealand
+      longitude: 174.0752,
+      latitudeDelta: 0.0922,  // Closer zoom
+      longitudeDelta: 0.0421
+    });
+    ```
+  </Tab>
+  
+  <Tab title="User Location">
+    ```typescript
+    import Geolocation from '@react-native-community/geolocation';
+
+    const getCurrentLocation = () => {
+      Geolocation.getCurrentPosition(
+        (position) => {
+          const newRegion = {
+            latitude: position.coords.latitude,
+            longitude: position.coords.longitude,
+            latitudeDelta: 0.0922,
+            longitudeDelta: 0.0421
+          };
+          setRegion(newRegion);
+          mapRef.current?.animateToRegion(newRegion);
+        },
+        (error) => console.error(error),
+        { enableHighAccuracy: true, timeout: 20000 }
+      );
+    };
+    ```
+  </Tab>
+  
+  <Tab title="Fit Deployments">
+    ```typescript
+    import { fitToCoordinates } from 'react-native-maps';
+
+    const fitToDeployments = () => {
+      if (!deployments?.length) return;
+      
+      const coordinates = deployments
+        .filter(d => d.latitude && d.longitude)
+        .map(d => ({
+          latitude: d.latitude!,
+          longitude: d.longitude!
+        }));
+      
+      mapRef.current?.fitToCoordinates(coordinates, {
+        edgePadding: { top: 50, right: 50, bottom: 50, left: 50 },
+        animated: true
+      });
+    };
+    ```
+  </Tab>
+</Tabs>
+
+### Deployment Markers
+
+Markers display deployment locations on the map:
+
+```typescript
+import { Marker } from 'react-native-maps';
+
+<Marker
+  coordinate={{
+    latitude: deployment.latitude,
+    longitude: deployment.longitude
+  }}
+  title={deployment.locationName || `Deployment #${deployment.id.slice(-4)}`}
+  description={deployment.deploymentComments}
+  onPress={() => handleMarkerPress(deployment.id)}
+/>
+```
+
+<Note>
+Only deployments with valid latitude and longitude coordinates are displayed on the map.
+</Note>
+
+### Custom Marker Icons
+
+```typescript
+import { Marker } from 'react-native-maps';
+import { Image } from 'react-native';
+
+<Marker
+  coordinate={{ latitude, longitude }}
+  title="Active Deployment"
+>
+  <Image
+    source={require('../../assets/marker-active.png')}
+    style={{ width: 32, height: 32 }}
+  />
+</Marker>
+```
+
+## Map Controls
+
+### Search Bar
+
+```typescript src/navigation/screens/Maps.tsx
+import { Searchbar } from 'react-native-paper';
+import { useState } from 'react';
+
+const Maps = () => {
+  const [searchQuery, setSearchQuery] = useState('');
+  
+  const handleSearch = async (query: string) => {
+    // Implement geocoding or deployment search
+    const results = deployments?.filter(d => 
+      d.locationName?.toLowerCase().includes(query.toLowerCase())
+    );
+    
+    if (results?.length) {
+      const first = results[0];
+      if (first.latitude && first.longitude) {
+        mapRef.current?.animateToRegion({
+          latitude: first.latitude,
+          longitude: first.longitude,
+          latitudeDelta: 0.01,
+          longitudeDelta: 0.01
+        });
+      }
+    }
+  };
+
+  return (
+    <View style={styles.searchContainer}>
+      <Searchbar
+        placeholder="Search location"
+        onChangeText={setSearchQuery}
+        value={searchQuery}
+        onSubmitEditing={() => handleSearch(searchQuery)}
+      />
+    </View>
+  );
+};
+```
+
+### Zoom Controls
+
+```typescript
+import { FAB } from 'react-native-paper';
+
+const Maps = () => {
+  const zoomIn = useCallback(() => {
+    setRegion(prev => ({
+      ...prev,
+      latitudeDelta: prev.latitudeDelta / 2,
+      longitudeDelta: prev.longitudeDelta / 2
+    }));
+  }, []);
+
+  const zoomOut = useCallback(() => {
+    setRegion(prev => ({
+      ...prev,
+      latitudeDelta: prev.latitudeDelta * 2,
+      longitudeDelta: prev.longitudeDelta * 2
+    }));
+  }, []);
+
+  return (
+    <View style={styles.fabContainer}>
+      <FAB
+        icon="plus"
+        onPress={zoomIn}
+        style={styles.fab}
+      />
+      <FAB
+        icon="minus"
+        onPress={zoomOut}
+        style={styles.fab}
+      />
+    </View>
+  );
+};
+
+const styles = StyleSheet.create({
+  fabContainer: {
+    position: 'absolute',
+    right: 16,
+    bottom: 16,
+    gap: 8
+  },
+  fab: {
+    borderRadius: 8
+  }
+});
+```
+
+### Location Button
+
+```typescript
+import Geolocation from '@react-native-community/geolocation';
+
+const getCurrentLocation = useCallback(() => {
+  if (!locationEnabled) {
+    Alert.alert(
+      'Location Disabled',
+      'Please enable location services to use this feature'
+    );
+    return;
+  }
+
+  Geolocation.getCurrentPosition(
+    (position) => {
+      const newRegion = {
+        latitude: position.coords.latitude,
+        longitude: position.coords.longitude,
+        latitudeDelta: 0.0922,
+        longitudeDelta: 0.0421
+      };
+      setRegion(newRegion);
+      mapRef.current?.animateToRegion(newRegion);
+    },
+    (error) => {
+      console.error('Location error:', error);
+      Alert.alert('Error', 'Unable to get your location');
+    },
+    { enableHighAccuracy: true, timeout: 20000, maximumAge: 1000 }
+  );
+}, [locationEnabled]);
+
+<FAB
+  icon="crosshairs-gps"
+  onPress={getCurrentLocation}
+  disabled={!locationEnabled}
+/>
+```
+
+## Observations API
+
+Record wildlife observations linked to deployments:
+
+### Data Structure
+
+```typescript
+type Observation = {
+  _id: string
+  deploymentId: string
+  speciesId?: string
+  timestamp: string
+  latitude?: number
+  longitude?: number
+  notes?: string
+  imageUrl?: string
+  createdAt: string
+  updatedAt: string
+}
+```
+
+### Fetching Observations
+
+```typescript
+import { useGetObservationsQuery } from '../../redux/api/observations';
+
+const ObservationList = () => {
+  const { data: observations, isLoading } = useGetObservationsQuery();
+
+  if (isLoading) return <WWLoader />;
+
+  return (
+    <FlatList
+      data={observations}
+      renderItem={({ item }) => <ObservationCard observation={item} />}
+      keyExtractor={(item) => item._id}
+    />
+  );
+};
+```
+
+### Creating an Observation
+
+```typescript
+import { useCreateObservationMutation } from '../../redux/api/observations';
+import { useState } from 'react';
+import Geolocation from '@react-native-community/geolocation';
+
+const AddObservation = ({ deploymentId }: { deploymentId: string }) => {
+  const [notes, setNotes] = useState('');
+  const [location, setLocation] = useState<{ latitude: number; longitude: number }>();
+  const [createObservation, { isLoading }] = useCreateObservationMutation();
+
+  const captureLocation = () => {
+    Geolocation.getCurrentPosition(
+      (position) => {
+        setLocation({
+          latitude: position.coords.latitude,
+          longitude: position.coords.longitude
+        });
+      },
+      (error) => console.error(error),
+      { enableHighAccuracy: true }
+    );
+  };
+
+  const handleSubmit = async () => {
+    try {
+      await createObservation({
+        deploymentId,
+        timestamp: new Date().toISOString(),
+        latitude: location?.latitude,
+        longitude: location?.longitude,
+        notes
+      }).unwrap();
+
+      Alert.alert('Success', 'Observation recorded');
+      navigation.goBack();
+    } catch (error) {
+      Alert.alert('Error', 'Failed to create observation');
+    }
+  };
+
+  return (
+    <WWScreenView>
+      <WWTextInput
+        label="Notes"
+        value={notes}
+        onChangeText={setNotes}
+        multiline
+        numberOfLines={4}
+      />
+
+      <WWButton mode="outlined" onPress={captureLocation}>
+        Capture Location
+      </WWButton>
+
+      {location && (
+        <WWText>
+          📍 {location.latitude.toFixed(6)}, {location.longitude.toFixed(6)}
+        </WWText>
+      )}
+
+      <WWButton
+        mode="contained"
+        onPress={handleSubmit}
+        loading={isLoading}
+        disabled={isLoading}
+      >
+        Save Observation
+      </WWButton>
+    </WWScreenView>
+  );
+};
+```
+
+### Updating an Observation
+
+```typescript
+import { useUpdateObservationMutation } from '../../redux/api/observations';
+
+const EditObservation = ({ observationId }: { observationId: string }) => {
+  const { data: observation } = useGetObservationByIdQuery(observationId);
+  const [updateObservation] = useUpdateObservationMutation();
+  const [notes, setNotes] = useState(observation?.notes || '');
+
+  const handleUpdate = async () => {
+    await updateObservation({
+      id: observationId,
+      body: { notes }
+    });
+  };
+
+  // ... rest of component
+};
+```
+
+### Deleting an Observation
+
+```typescript
+import { useDeleteObservationMutation } from '../../redux/api/observations';
+
+const ObservationActions = ({ observationId }: { observationId: string }) => {
+  const [deleteObservation] = useDeleteObservationMutation();
+
+  const handleDelete = async () => {
+    Alert.alert(
+      'Delete Observation',
+      'Are you sure?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          onPress: async () => {
+            await deleteObservation(observationId);
+            navigation.goBack();
+          }
+        }
+      ]
+    );
+  };
+
+  // ... rest of component
+};
+```
+
+## Displaying Observations on Map
+
+```typescript
+import { Marker } from 'react-native-maps';
+import { useGetObservationsQuery } from '../../redux/api/observations';
+
+const Maps = () => {
+  const { data: deployments } = useGetDeploymentsQuery();
+  const { data: observations } = useGetObservationsQuery();
+
+  return (
+    <MapView ...>
+      {/* Deployment markers */}
+      {deployments?.map((deployment) => (
+        <Marker
+          key={`deployment-${deployment.id}`}
+          coordinate={{
+            latitude: deployment.latitude!,
+            longitude: deployment.longitude!
+          }}
+          title={deployment.locationName}
+          pinColor="blue"
+        />
+      ))}
+
+      {/* Observation markers */}
+      {observations?.map((observation) =>
+        observation.latitude && observation.longitude ? (
+          <Marker
+            key={`observation-${observation._id}`}
+            coordinate={{
+              latitude: observation.latitude,
+              longitude: observation.longitude
+            }}
+            title="Wildlife Observation"
+            description={observation.notes}
+            pinColor="green"
+          />
+        ) : null
+      )}
+    </MapView>
+  );
+};
+```
+
+## Location Permissions
+
+Check and request location permissions:
+
+```typescript src/hooks/useLocationStatus.ts
+import { useAppSelector } from '../redux';
+import { PermissionsAndroid, Platform } from 'react-native';
+
+const requestLocationPermission = async () => {
+  if (Platform.OS === 'android') {
+    const granted = await PermissionsAndroid.request(
+      PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION,
+      {
+        title: 'Location Permission',
+        message: 'Wildlife Watcher needs access to your location',
+        buttonPositive: 'OK'
+      }
+    );
+    return granted === PermissionsAndroid.RESULTS.GRANTED;
+  }
+  return true; // iOS handles permissions differently
+};
+
+const MyComponent = () => {
+  const { locationEnabled } = useAppSelector(state => state.locationStatus);
+  
+  useEffect(() => {
+    if (!locationEnabled) {
+      requestLocationPermission();
+    }
+  }, []);
+};
+```
+
+## Map Styling
+
+```typescript
+const styles = StyleSheet.create({
+  container: {
+    flex: 1
+  },
+  searchContainer: {
+    position: 'absolute',
+    top: 10,
+    left: 10,
+    right: 10,
+    zIndex: 1
+  },
+  searchBar: {
+    elevation: 5,
+    borderRadius: 8
+  },
+  map: {
+    flex: 1
+  },
+  fabContainer: {
+    position: 'absolute',
+    right: 16,
+    bottom: 16,
+    gap: 8
+  },
+  fab: {
+    borderRadius: 8
+  }
+});
+```
+
+## Best Practices
+
+<Card title="Performance" icon="gauge-high">
+- Filter markers before rendering to reduce overhead
+- Use `useMemo` for computed marker arrays
+- Implement marker clustering for dense deployments
+</Card>
+
+<Card title="User Experience" icon="user">
+- Show loading states while fetching location
+- Provide visual feedback for location capture
+- Display helpful error messages for permission issues
+</Card>
+
+<Card title="Accuracy" icon="bullseye">
+- Use `enableHighAccuracy: true` for GPS readings
+- Store coordinates with 6+ decimal places
+- Display coordinate precision in UI
+</Card>
+
+<Card title="Privacy" icon="shield">
+- Request location permissions only when needed
+- Explain why location access is required
+- Allow users to manually enter coordinates if preferred
+</Card>
+
+## Related
+
+- [Projects & Deployments](/features/projects-deployments) - Managing deployments
+- [Device Management](/features/device-management) - Linking devices to deployments

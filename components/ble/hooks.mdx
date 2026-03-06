@@ -1,0 +1,420 @@
+---
+title: "BLE Hooks"
+description: "React hooks for managing Bluetooth Low Energy communication with Wildlife Watcher devices"
+---
+
+# BLE Hooks
+
+The Wildlife Watcher app provides several React hooks for managing BLE connections and device communication.
+
+## useBle
+
+The core hook for BLE operations. Manages scanning, connecting, disconnecting, and writing to devices.
+
+### Import
+
+```typescript
+import { useBle } from '../hooks/useBle'
+```
+
+### Usage
+
+```typescript
+const {
+  isBleConnecting,
+  startScan,
+  connectDevice,
+  disconnectDevice,
+  write,
+  enginePause,
+  enginePaused,
+  pingsPause,
+  pingsPaused
+} = useBle()
+```
+
+### Return Values
+
+<ResponseField name="isBleConnecting" type="boolean | undefined">
+  Indicates whether a BLE connection is currently in progress
+</ResponseField>
+
+<ResponseField name="startScan" type="(length?: number) => void">
+  Starts scanning for nearby devices
+  
+  <ParamField path="length" type="number" default="6">
+    Scan duration in seconds
+  </ParamField>
+</ResponseField>
+
+<ResponseField name="connectDevice" type="(peripheral: ExtendedPeripheral, timeout?: number) => Promise<ExtendedPeripheral>">
+  Connects to a BLE device
+  
+  <ParamField path="peripheral" type="ExtendedPeripheral" required>
+    The device to connect to
+  </ParamField>
+  
+  <ParamField path="timeout" type="number">
+    Connection timeout in milliseconds
+  </ParamField>
+</ResponseField>
+
+<ResponseField name="disconnectDevice" type="(peripheral: ExtendedPeripheral) => void">
+  Disconnects from a BLE device
+</ResponseField>
+
+<ResponseField name="write" type="(peripheral: ExtendedPeripheral, data: (string | WriteData)[]) => Promise<void>">
+  Writes commands to a BLE device. Commands are queued and executed sequentially with a 500ms pause between each.
+  
+  <ParamField path="peripheral" type="ExtendedPeripheral" required>
+    The device to write to
+  </ParamField>
+  
+  <ParamField path="data" type="(string | WriteData)[]" required>
+    Array of raw strings or command tuples `[CommandNames, CommandConstructOptions]`
+  </ParamField>
+</ResponseField>
+
+<ResponseField name="enginePause" type="(toggle: boolean) => void">
+  Pauses or resumes the BLE write engine. When paused, all queued operations are cleared.
+</ResponseField>
+
+<ResponseField name="enginePaused" type="React.MutableRefObject<boolean>">
+  Ref indicating whether the engine is currently paused
+</ResponseField>
+
+<ResponseField name="pingsPause" type="(toggle: boolean) => void">
+  Pauses or resumes automatic ping operations without clearing the queue
+</ResponseField>
+
+<ResponseField name="pingsPaused" type="React.MutableRefObject<boolean>">
+  Ref indicating whether pings are currently paused
+</ResponseField>
+
+### Example
+
+<CodeGroup>
+```typescript Scanning
+const { startScan } = useBle()
+
+// Scan for 10 seconds
+startScan(10)
+```
+
+```typescript Connecting
+const { connectDevice } = useBle()
+
+const handleConnect = async (device: ExtendedPeripheral) => {
+  try {
+    const connectedDevice = await connectDevice(device, 15000)
+    console.log('Connected:', connectedDevice.id)
+  } catch (error) {
+    console.error('Connection failed:', error)
+  }
+}
+```
+
+```typescript Writing Commands
+const { write } = useBle()
+
+// Write multiple commands
+await write(device, [
+  [CommandNames.BATTERY, { control: CommandControlTypes.READ }],
+  [CommandNames.SENSOR, { control: CommandControlTypes.WRITE, value: "enable" }],
+  "status" // Raw command string
+])
+```
+</CodeGroup>
+
+<Note>
+  The write engine uses an internal queue with a 500ms delay between commands to prevent overwhelming the device buffer. Commands marked as `canBeIgnored` (like pings) are skipped when `pingsPaused` is true.
+</Note>
+
+---
+
+## useCommand
+
+Manages reading and writing a specific command for a device with automatic retry and timeout handling.
+
+### Import
+
+```typescript
+import { useCommand } from '../hooks/useCommand'
+```
+
+### Usage
+
+```typescript
+const { set, get, commandLoading } = useCommand({
+  deviceId: device.id,
+  command: COMMANDS.BATTERY
+})
+```
+
+### Props
+
+<ParamField path="deviceId" type="string" required>
+  The ID of the device to communicate with
+</ParamField>
+
+<ParamField path="command" type="Command" required>
+  The command definition from the COMMANDS object
+</ParamField>
+
+### Return Values
+
+<ResponseField name="set" type="(data?: string) => void">
+  Writes a value to the device. Automatically retries every 7 seconds until successful or 10 second timeout.
+  
+  For action-only commands (no `readRegex` or `readCommand`), this executes immediately without waiting for confirmation.
+</ResponseField>
+
+<ResponseField name="get" type="() => void">
+  Reads the current value from the device. Automatically retries every 7 seconds until successful or 10 second timeout.
+  
+  Only works if the command has a `readCommand` defined.
+</ResponseField>
+
+<ResponseField name="commandLoading" type="boolean">
+  Indicates whether the command is currently being executed
+</ResponseField>
+
+### Example
+
+<CodeGroup>
+```typescript Reading Values
+import { COMMANDS } from '../ble/types'
+
+const BatteryDisplay = ({ deviceId }: { deviceId: string }) => {
+  const { get, commandLoading } = useCommand({
+    deviceId,
+    command: COMMANDS.BATTERY
+  })
+  
+  const configuration = useAppSelector((state) => state.configuration)
+  const batteryValue = configuration[deviceId]?.BATTERY?.value
+  
+  useEffect(() => {
+    get() // Automatically fetches battery on mount
+  }, [])
+  
+  if (commandLoading) return <Text>Loading...</Text>
+  
+  return <Text>Battery: {batteryValue}%</Text>
+}
+```
+
+```typescript Writing Values
+const SensorToggle = ({ deviceId }: { deviceId: string }) => {
+  const { set, commandLoading } = useCommand({
+    deviceId,
+    command: COMMANDS.SENSOR
+  })
+  
+  const handleToggle = (enabled: boolean) => {
+    set(enabled ? "enable" : "disable")
+  }
+  
+  return (
+    <Button 
+      onPress={() => handleToggle(true)}
+      disabled={commandLoading}
+    >
+      {commandLoading ? 'Setting...' : 'Enable Sensor'}
+    </Button>
+  )
+}
+```
+
+```typescript LoRaWAN Configuration
+const DeviceConfig = ({ deviceId }: { deviceId: string }) => {
+  const { set: setDevEui } = useCommand({
+    deviceId,
+    command: COMMANDS.DEVEUI
+  })
+  
+  const { set: setAppKey } = useCommand({
+    deviceId,
+    command: COMMANDS.APPKEY
+  })
+  
+  const configureDevice = () => {
+    setDevEui("AA:BB:CC:DD:EE:FF:00:11")
+    setAppKey("00:11:22:33:44:55:66:77:88:99:AA:BB:CC:DD:EE:FF")
+  }
+  
+  return <Button onPress={configureDevice}>Configure LoRaWAN</Button>
+}
+```
+</CodeGroup>
+
+<Note>
+  The hook automatically calls `get()` on mount if the command has a `readCommand`. It also handles cleanup of timers when the component unmounts.
+</Note>
+
+### Behavior
+
+- **Retry Interval**: Commands retry every 7 seconds (INTERVAL)
+- **Timeout**: Commands timeout after 10 seconds (TIMEOUT)
+- **Auto-fetch**: Automatically fetches value on mount if `readCommand` exists
+- **Goal Tracking**: Tracks the desired value and stops retrying when achieved
+- **Error Handling**: Dispatches error to Redux state on timeout
+
+---
+
+## useBleListeners
+
+Attaches event listeners for BLE events and updates Redux state accordingly. This hook is used internally by the `ListenToBleEngineProvider`.
+
+### Import
+
+```typescript
+import { useBleListeners } from '../hooks/useBleListeners'
+```
+
+### Usage
+
+```typescript
+// Typically used within a provider
+const MyBleProvider = ({ children }) => {
+  useBleListeners()
+  return <>{children}</>
+}
+```
+
+### Events Handled
+
+<ResponseField name="BleManagerDiscoverPeripheral">
+  Fires when a new device is discovered during scanning. Updates Redux with device info.
+</ResponseField>
+
+<ResponseField name="BleManagerStopScan">
+  Fires when scanning stops. Marks devices as lost if they weren't found in the scan.
+</ResponseField>
+
+<ResponseField name="BleManagerDisconnectPeripheral">
+  Fires when a device disconnects. Cleans up device state and removes it from cache (Android).
+</ResponseField>
+
+<ResponseField name="BleManagerDidUpdateValueForCharacteristic">
+  Fires when characteristic values are updated. Parses logs and updates device configuration.
+</ResponseField>
+
+### Log Management
+
+The hook maintains device logs with automatic trimming:
+
+- **Max Log Length**: 15,000 characters
+- **Trim Interval**: Every 5 seconds
+- **Parsing**: Uses `parseLogs` to extract command responses from log buffer
+
+### Example
+
+<CodeGroup>
+```typescript Provider Pattern
+import { useBleListeners } from '../hooks/useBleListeners'
+
+export const BleEventProvider = ({ children }: PropsWithChildren) => {
+  useBleListeners()
+  return <>{children}</>
+}
+```
+
+```typescript Accessing Parsed Data
+import { useAppSelector } from '../redux'
+
+const DeviceStatus = ({ deviceId }: { deviceId: string }) => {
+  const configuration = useAppSelector(
+    (state) => state.configuration[deviceId]
+  )
+  
+  const logs = useAppSelector(
+    (state) => state.logs[deviceId]
+  )
+  
+  return (
+    <View>
+      <Text>Battery: {configuration.BATTERY?.value}%</Text>
+      <Text>Sensor: {configuration.SENSOR?.value}</Text>
+      <Text>Raw Logs: {logs.log}</Text>
+    </View>
+  )
+}
+```
+</CodeGroup>
+
+<Note>
+  This hook uses refs to maintain updated state within event listeners, preventing stale closure issues.
+</Note>
+
+---
+
+## useReconnectDevice
+
+Monitors device connection status and navigates to the Home screen if the device disconnects.
+
+### Import
+
+```typescript
+import { useReconnectDevice } from '../hooks/useReconnectDevice'
+```
+
+### Usage
+
+```typescript
+const DeviceScreen = ({ route }) => {
+  const deviceId = route.params.deviceId
+  
+  useReconnectDevice({ deviceId })
+  
+  return (
+    <View>
+      {/* Device controls */}
+    </View>
+  )
+}
+```
+
+### Props
+
+<ParamField path="deviceId" type="string" required>
+  The ID of the device to monitor
+</ParamField>
+
+<ParamField path="initialTarget" type="number">
+  (Unused in current implementation)
+</ParamField>
+
+### Behavior
+
+When the device's `connected` status changes to `false`, the hook automatically navigates to the "Home" screen.
+
+### Example
+
+```typescript
+import { useReconnectDevice } from '../hooks/useReconnectDevice'
+import { useAppNavigation } from '../hooks/useAppNavigation'
+
+const ConfigurationScreen = ({ route }) => {
+  const deviceId = route.params.deviceId
+  
+  // Automatically handles disconnection
+  useReconnectDevice({ deviceId })
+  
+  return (
+    <View>
+      <Text>Configuring Device</Text>
+      {/* Configuration UI */}
+    </View>
+  )
+}
+```
+
+<Note>
+  This hook is particularly useful for screens that require an active device connection. It provides a consistent user experience by automatically returning to the home screen on disconnection.
+</Note>
+
+## Related
+
+- [BLE Commands](/components/ble/commands) - Complete command reference
+- [BLE Providers](/components/ble/providers) - Context providers for BLE functionality

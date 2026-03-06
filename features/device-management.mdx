@@ -1,0 +1,458 @@
+---
+title: Device Management
+description: Managing BLE devices, connections, and device state in the Wildlife Watcher app
+---
+
+## Overview
+
+The Wildlife Watcher app manages BLE-connected field devices through Redux state management, providing real-time device discovery, connection status tracking, and configuration management.
+
+## Device State Management
+
+Devices are stored in Redux state with the following structure:
+
+```typescript src/redux/slices/devicesSlice.ts
+export type ExtendedPeripheral = Peripheral & {
+  connected?: boolean
+  loading?: boolean
+  signalLost?: boolean
+  intervals?: {
+    ping?: NodeJS.Timer
+  }
+  services?: {
+    serviceCharacteristic: string
+    readCharacteristic: string
+  }
+}
+```
+
+### Device Properties
+
+| Property | Type | Description |
+|----------|------|-------------|
+| `id` | string | Unique device identifier (MAC address) |
+| `name` | string | Device name (e.g., "WW-1234") |
+| `rssi` | number | Signal strength (-127 to 0) |
+| `connected` | boolean | Connection status |
+| `loading` | boolean | Connection in progress |
+| `signalLost` | boolean | Device out of range |
+| `intervals` | object | Active timers (ping keep-alive) |
+| `services` | object | BLE service and characteristic UUIDs |
+
+## Scanning for Devices
+
+### Basic Scanning
+
+```typescript src/navigation/screens/Deployments.tsx
+import { useBleActions } from '../../providers/BleEngineProvider';
+import { useAppSelector } from '../../redux';
+
+const DeploymentScreen = () => {
+  const { startScan, isBleConnecting } = useBleActions();
+  const { isScanning } = useAppSelector(state => state.scanning);
+  
+  const handleScan = () => {
+    if (!isBleConnecting && !isScanning) {
+      startScan(10); // Scan for 10 seconds
+    }
+  };
+
+  return (
+    <WWButton onPress={handleScan} loading={isScanning}>
+      {isScanning ? 'Scanning' : 'Scan'}
+    </WWButton>
+  );
+};
+```
+
+### Auto-Scanning
+
+Implement automatic periodic scanning:
+
+```typescript
+import { useEffect } from 'react';
+import { useIsFocused } from '@react-navigation/native';
+
+const MyScreen = () => {
+  const { startScan, isBleConnecting } = useBleActions();
+  const { isScanning } = useAppSelector(state => state.scanning);
+  const isFocused = useIsFocused();
+  
+  const isBleBusy = isBleConnecting || isScanning;
+
+  // Initial scan when screen is focused
+  useEffect(() => {
+    if (isFocused) {
+      startScan(10);
+    }
+  }, [isFocused]);
+
+  // Periodic scanning every 15 seconds
+  useEffect(() => {
+    if (!isFocused) return;
+
+    const interval = setInterval(() => {
+      if (!isBleBusy && isFocused) {
+        startScan(10);
+      }
+    }, 15 * 1000);
+
+    return () => clearInterval(interval);
+  }, [isScanning, isBleConnecting, isBleBusy, startScan, isFocused]);
+};
+```
+
+<Note>
+Automatic scanning should only run when the screen is focused to conserve battery and prevent unnecessary BLE operations.
+</Note>
+
+## Device Discovery & Filtering
+
+### Accessing Devices
+
+```typescript
+import { useAppSelector } from '../../redux';
+import { ExtendedPeripheral } from '../../redux/slices/devicesSlice';
+
+const DeviceList = () => {
+  const devices = useAppSelector(state => state.devices);
+  
+  // Convert devices object to array and filter
+  const devicesToDisplay = Object.values(devices)
+    .filter(device => !device.signalLost)
+    .sort((a, b) => {
+      // Sort by signal strength (RSSI)
+      if (a.rssi && b.rssi) {
+        if (b.rssi === 127 || a.rssi === 127) return -1;
+        return b.rssi - a.rssi;
+      }
+      return -1;
+    });
+
+  return (
+    <FlatList
+      data={devicesToDisplay}
+      renderItem={({ item }) => <DeviceItem device={item} />}
+      keyExtractor={(item) => item.id}
+    />
+  );
+};
+```
+
+### Device Filtering
+
+<Tabs>
+  <Tab title="By Connection Status">
+    ```typescript
+    // Only connected devices
+    const connectedDevices = Object.values(devices)
+      .filter(device => device.connected);
+
+    // Only disconnected devices
+    const availableDevices = Object.values(devices)
+      .filter(device => !device.connected && !device.signalLost);
+    ```
+  </Tab>
+  
+  <Tab title="By Signal Strength">
+    ```typescript
+    // Strong signal devices (RSSI > -70)
+    const nearbyDevices = Object.values(devices)
+      .filter(device => device.rssi && device.rssi > -70);
+
+    // Weak signal devices
+    const distantDevices = Object.values(devices)
+      .filter(device => device.rssi && device.rssi <= -70);
+    ```
+  </Tab>
+  
+  <Tab title="By Name Pattern">
+    ```typescript
+    import { isOurDevice } from '../utils/helpers';
+
+    // Only Wildlife Watcher devices
+    const wwDevices = Object.values(devices)
+      .filter(device => device.name && isOurDevice(device.name));
+    ```
+  </Tab>
+</Tabs>
+
+## Connecting to Devices
+
+### Basic Connection
+
+```typescript
+import { useBleActions } from '../../providers/BleEngineProvider';
+
+const DeviceItem = ({ device }: { device: ExtendedPeripheral }) => {
+  const { connectDevice } = useBleActions();
+  
+  const handleConnect = async () => {
+    const connectedDevice = await connectDevice(device);
+    
+    if (connectedDevice.connected) {
+      console.log('Successfully connected!');
+      // Navigate to device details screen
+    }
+  };
+
+  return (
+    <WWButton 
+      onPress={handleConnect}
+      loading={device.loading}
+      disabled={device.loading}
+    >
+      {device.connected ? 'Connected' : 'Connect'}
+    </WWButton>
+  );
+};
+```
+
+### Connection with Timeout
+
+```typescript
+const handleConnectWithTimeout = async (device: ExtendedPeripheral) => {
+  try {
+    // 30 second timeout
+    const connectedDevice = await connectDevice(device, 30000);
+    
+    if (connectedDevice.connected) {
+      navigation.navigate('DeviceNavigator', { deviceId: device.id });
+    }
+  } catch (error) {
+    console.error('Connection failed:', error);
+    Alert.alert('Connection Failed', 'Unable to connect to device');
+  }
+};
+```
+
+<Note type="warning">
+The connection timeout parameter is optional. If not specified, the default BLE manager timeout applies. Use timeouts for better user experience.
+</Note>
+
+## Disconnecting Devices
+
+```typescript
+import { useBleActions } from '../../providers/BleEngineProvider';
+
+const DeviceControls = ({ device }: { device: ExtendedPeripheral }) => {
+  const { disconnectDevice } = useBleActions();
+  
+  const handleDisconnect = async () => {
+    await disconnectDevice(device);
+    console.log('Device disconnected');
+  };
+
+  return (
+    <WWButton 
+      mode="outlined"
+      onPress={handleDisconnect}
+    >
+      Disconnect
+    </WWButton>
+  );
+};
+```
+
+<Steps>
+  <Step title="Clear Command Queue">
+    All pending BLE commands are removed from the queue.
+  </Step>
+  
+  <Step title="Stop Keep-Alive">
+    The automatic ping interval is cleared.
+  </Step>
+  
+  <Step title="BLE Disconnect">
+    The BLE manager disconnects from the device.
+  </Step>
+  
+  <Step title="Update Redux State">
+    Device state is updated with `connected: false`.
+  </Step>
+</Steps>
+
+## Device Selection Hook
+
+For accessing a specific device by ID:
+
+```typescript src/hooks/useSelectDevice.tsx
+import { useSelectDevice } from '../../hooks/useSelectDevice';
+
+const DeviceDetailsScreen = ({ route }) => {
+  const { deviceId } = route.params;
+  const device = useSelectDevice({ deviceId });
+  
+  if (!device) {
+    return <Text>Device not found</Text>;
+  }
+
+  return (
+    <View>
+      <Text>Device: {device.name}</Text>
+      <Text>RSSI: {device.rssi}</Text>
+      <Text>Status: {device.connected ? 'Connected' : 'Disconnected'}</Text>
+    </View>
+  );
+};
+```
+
+## Device Configuration
+
+Device configuration is tracked separately in Redux:
+
+```typescript
+import { useAppSelector } from '../../redux';
+
+const DeviceConfig = ({ deviceId }: { deviceId: string }) => {
+  const configuration = useAppSelector(state => state.configuration);
+  const deviceConfig = configuration[deviceId];
+  
+  // Access specific command values
+  const batteryLevel = deviceConfig?.BATTERY?.value;
+  const heartbeat = deviceConfig?.HEARTBEAT?.value;
+  const firmwareVersion = deviceConfig?.VERSION?.value;
+
+  return (
+    <View>
+      <Text>Battery: {batteryLevel}%</Text>
+      <Text>Heartbeat: {heartbeat}</Text>
+      <Text>Firmware: {firmwareVersion}</Text>
+    </View>
+  );
+};
+```
+
+### Configuration State Structure
+
+```typescript
+type ConfigKey = {
+  value?: string | number
+  loading?: boolean
+  loaded?: boolean
+  error?: string
+}
+
+type DeviceConfiguration = {
+  [deviceId: string]: {
+    [commandName: string]: ConfigKey
+  }
+}
+```
+
+## Device API Integration
+
+The app provides RTK Query hooks for syncing devices with the backend:
+
+```typescript src/redux/api/devices/index.ts
+import {
+  useGetDevicesQuery,
+  useGetDeviceByIdQuery,
+  useCreateDeviceMutation,
+  useUpdateDeviceMutation,
+  useDeleteDeviceMutation
+} from '../../redux/api/devices';
+
+const DeviceManagement = () => {
+  // Fetch all devices from API
+  const { data: devices, isLoading } = useGetDevicesQuery();
+  
+  // Create device mutation
+  const [createDevice] = useCreateDeviceMutation();
+  
+  // Update device mutation
+  const [updateDevice] = useUpdateDeviceMutation();
+  
+  // Delete device mutation
+  const [deleteDevice] = useDeleteDeviceMutation();
+
+  const handleCreateDevice = async () => {
+    try {
+      const newDevice = await createDevice({
+        name: 'WW-1234',
+        deviceId: 'ABC123',
+        status: 'active'
+      }).unwrap();
+      
+      console.log('Device created:', newDevice);
+    } catch (error) {
+      console.error('Failed to create device:', error);
+    }
+  };
+
+  const handleUpdateDevice = async (deviceId: string) => {
+    await updateDevice({
+      id: deviceId,
+      body: { status: 'inactive' }
+    });
+  };
+
+  return (
+    <View>
+      {isLoading ? (
+        <WWLoader />
+      ) : (
+        devices?.map(device => (
+          <DeviceCard key={device._id} device={device} />
+        ))
+      )}
+    </View>
+  );
+};
+```
+
+## Reconnection Logic
+
+Implement automatic reconnection for dropped connections:
+
+```typescript src/hooks/useReconnectDevice.tsx
+import { useEffect } from 'react';
+import { useReconnectDevice } from '../../hooks/useReconnectDevice';
+
+const DeviceScreen = ({ deviceId }: { deviceId: string }) => {
+  const device = useSelectDevice({ deviceId });
+  const { connectDevice } = useBleActions();
+  
+  useEffect(() => {
+    // Attempt reconnection if device was connected but lost connection
+    if (device && device.signalLost && !device.loading) {
+      const reconnectTimer = setTimeout(() => {
+        connectDevice(device);
+      }, 5000); // Wait 5 seconds before reconnecting
+      
+      return () => clearTimeout(reconnectTimer);
+    }
+  }, [device?.signalLost]);
+};
+```
+
+## Best Practices
+
+<Card title="State Management" icon="database">
+- Always access devices through Redux selectors
+- Use memoized selectors for filtered device lists
+- Clean up intervals when devices disconnect
+</Card>
+
+<Card title="Connection Handling" icon="plug">
+- Check if device is already connecting before calling `connectDevice()`
+- Use the `loading` flag to disable UI during connection
+- Implement proper error handling for connection failures
+</Card>
+
+<Card title="Performance" icon="bolt">
+- Stop scanning when navigating away from device list
+- Limit auto-scan frequency to conserve battery
+- Filter out devices with `signalLost` from display lists
+</Card>
+
+<Card title="User Experience" icon="user">
+- Show loading indicators during connection/disconnection
+- Display signal strength to help users identify nearby devices
+- Provide clear feedback for connection errors
+</Card>
+
+## Related
+
+- [BLE Communication](/features/ble-communication) - Understanding BLE commands and protocols
+- [Firmware Updates](/features/firmware-updates) - Updating device firmware

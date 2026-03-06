@@ -1,0 +1,86 @@
+---
+title: 'Component Overview'
+description: 'A comprehensive guide to the Wildlife Watcher UI components'
+---
+
+## Introduction
+
+The Wildlife Watcher mobile app provides a set of custom UI components built on top of React Native Paper. These components follow consistent design patterns and include built-in error handling, accessibility features, and theme integration.
+
+## Component Categories
+
+### Buttons
+Interactive elements for user actions.
+
+- **WWButton** - Primary button component with error state support
+- **WWIconButton** - Icon-only button for compact UI elements
+
+### Inputs
+Form components for collecting user data.
+
+- **WWTextInput** - Text input field with validation and error states
+- **WWSelect** - Dropdown selection component
+- **WWCheckbox** - Checkbox input with label support
+
+### Layout
+Structural components for organizing screen content.
+
+- **WWScreenView** - Root screen container with scrolling and keyboard handling
+- **WWScrollView** - Flexible scroll container with gesture support
+
+### Feedback
+Components for displaying information and status to users.
+
+- **WWText** - Styled text component with theme variants
+- **WWIcon** - Icon display component
+- **WWLoader** - Loading indicator
+- **WWProgressBar** - Progress visualization with optional labels
+- **WWAvatar** - User avatar image component
+
+## Common Features
+
+All input components (Button, TextInput, Select) share these common features:
+
+<ParamField path="hasError" type="boolean">
+  Indicates an error state, applying error styling to the component
+</ParamField>
+
+<ParamField path="errorText" type="string">
+  Error message to display below the component when `hasError` is true
+</ParamField>
+
+<ParamField path="disabled" type="boolean">
+  Disables user interaction with the component
+</ParamField>
+
+## Theme Integration
+
+Components use the `useExtendedTheme` hook to access:
+- **colors** - Primary, secondary, and semantic colors
+- **spacing** - Consistent spacing values
+- **appPadding** - Standard app padding
+
+## Getting Started
+
+Import components from the UI components directory:
+
+```tsx
+import { WWButton, WWTextInput, WWScreenView } from '@/components/ui'
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Buttons" icon="circle-dot" href="/components/buttons">
+    Learn about button components
+  </Card>
+  <Card title="Inputs" icon="input-text" href="/components/inputs">
+    Explore form input components
+  </Card>
+  <Card title="Layout" icon="table-layout" href="/components/layout">
+    Understand layout containers
+  </Card>
+  <Card title="Feedback" icon="comment-dots" href="/components/feedback">
+    Discover feedback components
+  </Card>
+</CardGroup>

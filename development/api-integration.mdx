@@ -1,0 +1,432 @@
+---
+title: 'API Integration'
+description: 'RTK Query API integration patterns and endpoint configuration'
+---
+
+## Overview
+
+Wildlife Watcher uses RTK Query (Redux Toolkit Query) for efficient data fetching, caching, and state management of server data. All API endpoints are organized by resource type and follow consistent patterns.
+
+## Base API Configuration
+
+The base API is configured in `src/redux/api/index.ts`:
+
+```typescript src/redux/api/index.ts
+import { createApi } from "@reduxjs/toolkit/query/react"
+import { extendedBaseQuery } from "./fetch"
+
+const TAG_TYPES = [
+  "User",
+  "Device",
+  "Media",
+  "Observation",
+  "Project",
+  "SensorRecord",
+  "Deployment",
+  "ApiLog",
+] as const
+
+export const api = createApi({
+  reducerPath: "api",
+  baseQuery: extendedBaseQuery,
+  tagTypes: TAG_TYPES,
+  endpoints: () => ({}),
+})
+```
+
+<Note>
+The base API defines no endpoints - instead, endpoints are injected using `injectEndpoints()` in separate resource files.
+</Note>
+
+## Base Query Configuration
+
+Authentication and headers are configured in `src/redux/api/fetch.ts`:
+
+```typescript src/redux/api/fetch.ts
+import { fetchBaseQuery } from "@reduxjs/toolkit/query"
+import { RootState } from ".."
+import Config from "react-native-config"
+
+export const extendedBaseQuery = fetchBaseQuery({
+  baseUrl: Config.API_BASE,
+  prepareHeaders: (headers, { getState }) => {
+    const token = (getState() as RootState).authentication.token
+
+    // Add authentication token if available
+    if (token) {
+      headers.set("Authorization", `Bearer ${token}`)
+    }
+
+    headers.set("Content-type", "application/json")
+
+    return headers
+  },
+})
+```
+
+<Tip>
+The authentication token is automatically added to all API requests from Redux state.
+</Tip>
+
+## API Endpoints
+
+### Deployments API
+
+The deployments API provides full CRUD operations:
+
+```typescript src/redux/api/deployments/index.ts
+import { api } from ".."
+import { API_URLS } from "../urls"
+
+export const deploymentsApi = api.injectEndpoints({
+  endpoints: (builder) => ({
+    getDeployments: builder.query<Deployment[], void>({
+      query: () => ({
+        url: API_URLS.DEPLOYMENTS,
+        method: HttpMethod.GET,
+      }),
+      transformResponse: (response: ApiResponse<Deployment[]>) => response.data,
+      providesTags: (_result) =>
+        _result
+          ? [
+              ..._result.map(({ id }) => ({
+                type: "Deployment" as const,
+                id,
+              })),
+              { type: "Deployment", id: "LIST" },
+            ]
+          : [{ type: "Deployment", id: "LIST" }],
+    }),
+
+    getDeploymentById: builder.query<Deployment, string>({
+      query: (id) => ({
+        url: API_URLS.DEPLOYMENT_BY_ID(id),
+        method: HttpMethod.GET,
+      }),
+      transformResponse: (response: ApiResponse<Deployment>) => response.data,
+      providesTags: (_result, _error, id) => [{ type: "Deployment", id }],
+    }),
+
+    createDeployment: builder.mutation<Deployment, StrapiRequest<DeploymentCreate>>({
+      query: (body) => ({
+        url: API_URLS.DEPLOYMENTS,
+        method: HttpMethod.POST,
+        body,
+      }),
+      transformResponse: (response: ApiResponse<Deployment>) => response.data,
+      invalidatesTags: [{ type: "Deployment", id: "LIST" }],
+    }),
+
+    updateDeployment: builder.mutation<Deployment, { id: string; body: DeploymentUpdate }>({
+      query: ({ id, body }) => ({
+        url: API_URLS.DEPLOYMENT_BY_ID(id),
+        method: HttpMethod.PUT,
+        body,
+      }),
+      transformResponse: (response: ApiResponse<Deployment>) => response.data,
+      invalidatesTags: (_result, _error, { id }) => [
+        { type: "Deployment", id },
+        { type: "Deployment", id: "LIST" },
+      ],
+    }),
+
+    deleteDeployment: builder.mutation<void, string>({
+      query: (id) => ({
+        url: API_URLS.DEPLOYMENT_BY_ID(id),
+        method: HttpMethod.DELETE,
+      }),
+      invalidatesTags: (_result, _error, id) => [
+        { type: "Deployment", id },
+        { type: "Deployment", id: "LIST" },
+      ],
+    }),
+  }),
+})
+
+export const {
+  useGetDeploymentsQuery,
+  useGetDeploymentByIdQuery,
+  useCreateDeploymentMutation,
+  useUpdateDeploymentMutation,
+  useDeleteDeploymentMutation,
+} = deploymentsApi
+```
+
+### Projects API
+
+Similar pattern for projects resource:
+
+```typescript src/redux/api/projects/index.ts
+export const projectsApi = api.injectEndpoints({
+  endpoints: (builder) => ({
+    getProjects: builder.query<Project[], void>({
+      query: () => ({
+        url: API_URLS.PROJECTS,
+        method: HttpMethod.GET,
+      }),
+      transformResponse: (response: ApiResponse<Project[]>) => response.data,
+      providesTags: (_result) =>
+        _result
+          ? [
+              ..._result.map(({ id }) => ({ type: "Project" as const, id })),
+              { type: "Project", id: "LIST" },
+            ]
+          : [{ type: "Project", id: "LIST" }],
+    }),
+    // ... other CRUD operations
+  }),
+})
+
+export const {
+  useGetProjectsQuery,
+  useGetProjectByIdQuery,
+  useCreateProjectMutation,
+  useUpdateProjectMutation,
+  useDeleteProjectMutation,
+} = projectsApi
+```
+
+## Available API Resources
+
+The app includes RTK Query endpoints for the following resources:
+
+<CardGroup cols={2}>
+  <Card title="Auth" icon="lock">
+    Authentication and authorization endpoints
+  </Card>
+  
+  <Card title="Deployments" icon="upload">
+    Camera trap deployment management
+  </Card>
+  
+  <Card title="Devices" icon="bluetooth">
+    Hardware device registration and management
+  </Card>
+  
+  <Card title="Media" icon="image">
+    Photo and video file handling
+  </Card>
+  
+  <Card title="Observations" icon="eye">
+    Wildlife observation records
+  </Card>
+  
+  <Card title="Projects" icon="folder">
+    Project organization and settings
+  </Card>
+  
+  <Card title="Sensor Records" icon="chart-line">
+    Environmental sensor data
+  </Card>
+  
+  <Card title="Users" icon="user">
+    User profile and settings
+  </Card>
+</CardGroup>
+
+## Usage Patterns
+
+### Queries (Fetching Data)
+
+Queries automatically fetch data and handle caching:
+
+```tsx
+import { useGetDeploymentsQuery } from '../redux/api/deployments'
+
+const DeploymentList = () => {
+  const { data, isLoading, isError, error } = useGetDeploymentsQuery()
+  
+  if (isLoading) return <WWLoader />
+  if (isError) return <ErrorMessage error={error} />
+  
+  return (
+    <WWScrollView>
+      {data?.map(deployment => (
+        <DeploymentCard key={deployment.id} deployment={deployment} />
+      ))}
+    </WWScrollView>
+  )
+}
+```
+
+<Tip>
+Queries automatically refetch data when the component mounts and when tags are invalidated.
+</Tip>
+
+### Mutations (Modifying Data)
+
+Mutations handle create, update, and delete operations:
+
+```tsx
+import { useCreateDeploymentMutation } from '../redux/api/deployments'
+
+const AddDeploymentForm = () => {
+  const [createDeployment, { isLoading, isError, error }] = useCreateDeploymentMutation()
+  
+  const handleSubmit = async (data: DeploymentCreate) => {
+    try {
+      const result = await createDeployment({ data }).unwrap()
+      navigation.navigate('Deployments')
+    } catch (err) {
+      console.error('Failed to create deployment:', err)
+    }
+  }
+  
+  return (
+    <Form onSubmit={handleSubmit} loading={isLoading} />
+  )
+}
+```
+
+### Query with Parameters
+
+```tsx
+import { useGetDeploymentByIdQuery } from '../redux/api/deployments'
+
+const DeploymentDetails = ({ id }: { id: string }) => {
+  const { data: deployment, isLoading } = useGetDeploymentByIdQuery(id)
+  
+  if (isLoading) return <WWLoader />
+  
+  return (
+    <WWScreenView>
+      <WWText variant="h1">{deployment?.name}</WWText>
+      <WWText>{deployment?.description}</WWText>
+    </WWScreenView>
+  )
+}
+```
+
+## Cache Management
+
+### Automated Cache Invalidation
+
+RTK Query automatically invalidates and refetches data based on tags:
+
+```typescript
+// Creating a deployment invalidates the LIST tag
+createDeployment: builder.mutation({
+  invalidatesTags: [{ type: "Deployment", id: "LIST" }],
+})
+
+// This causes useGetDeploymentsQuery to refetch automatically
+getDeployments: builder.query({
+  providesTags: [{ type: "Deployment", id: "LIST" }],
+})
+```
+
+### Manual Cache Invalidation
+
+```tsx
+import { api } from '../redux/api'
+import { useAppDispatch } from '../redux'
+
+const RefreshButton = () => {
+  const dispatch = useAppDispatch()
+  
+  const handleRefresh = () => {
+    dispatch(api.util.invalidateTags(['Deployment']))
+  }
+  
+  return <WWButton onPress={handleRefresh}>Refresh</WWButton>
+}
+```
+
+## Response Transformation
+
+API responses are transformed to extract data:
+
+```typescript
+transformResponse: (response: ApiResponse<Deployment[]>) => response.data
+```
+
+This unwraps the Strapi API response format:
+
+```json
+{
+  "data": [...],
+  "meta": {...}
+}
+```
+
+To just return the data array.
+
+## Error Handling
+
+### Component-Level
+
+```tsx
+const MyComponent = () => {
+  const { data, isError, error } = useGetProjectsQuery()
+  
+  if (isError) {
+    return (
+      <ErrorView>
+        <WWText>Error: {error?.message || 'Something went wrong'}</WWText>
+      </ErrorView>
+    )
+  }
+  
+  return <ProjectList projects={data} />
+}
+```
+
+### Mutation Error Handling
+
+```tsx
+const [updateProject] = useUpdateProjectMutation()
+
+const handleUpdate = async (id: string, updates: ProjectUpdate) => {
+  try {
+    await updateProject({ id, body: { data: updates } }).unwrap()
+    // Success handling
+  } catch (error) {
+    if ('status' in error) {
+      // Handle RTK Query error
+      console.error('API Error:', error.status, error.data)
+    } else {
+      // Handle network error
+      console.error('Network Error:', error)
+    }
+  }
+}
+```
+
+## Best Practices
+
+<AccordionGroup>
+  <Accordion title="Use Generated Hooks" icon="wand-magic-sparkles">
+    Always use the auto-generated hooks (`useGetDeploymentsQuery`, `useCreateDeploymentMutation`) instead of manually dispatching endpoints.
+  </Accordion>
+
+  <Accordion title="Tag Strategy" icon="tags">
+    Use both specific tags (`{ type: "Deployment", id: "123" }`) and list tags (`{ type: "Deployment", id: "LIST" }`) for granular cache control.
+  </Accordion>
+
+  <Accordion title="Error Boundaries" icon="shield">
+    Wrap components using queries in error boundaries to handle unexpected failures gracefully.
+  </Accordion>
+
+  <Accordion title="Optimistic Updates" icon="bolt">
+    For better UX, consider implementing optimistic updates for mutations that are likely to succeed.
+  </Accordion>
+
+  <Accordion title="Polling" icon="rotate">
+    Use the `pollingInterval` option for data that needs to stay fresh:
+    ```tsx
+    useGetDeploymentsQuery(undefined, { pollingInterval: 30000 })
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Related Resources
+
+<CardGroup cols={2}>
+  <Card title="State Management" icon="store" href="./state-management">
+    Learn about Redux slices and local state
+  </Card>
+  
+  <Card title="Project Structure" icon="folder-tree" href="./project-structure">
+    Understand the codebase organization
+  </Card>
+</CardGroup>

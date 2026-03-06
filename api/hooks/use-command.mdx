@@ -1,0 +1,313 @@
+---
+title: 'useCommand'
+description: 'Simplified hook for reading and writing specific BLE commands with automatic retry and timeout handling'
+---
+
+## Overview
+
+The `useCommand` hook provides a high-level interface for interacting with specific BLE commands on connected devices. It handles command retries, timeouts, and state management automatically.
+
+## Import
+
+```typescript
+import { useCommand } from '../hooks/useCommand'
+import { COMMANDS } from '../ble/types'
+```
+
+## Usage
+
+```typescript
+import { useCommand } from '../hooks/useCommand'
+import { COMMANDS } from '../ble/types'
+
+const DeviceSettings = ({ deviceId }) => {
+  // Read-only command
+  const { get: getBattery, commandLoading: batteryLoading } = useCommand({
+    deviceId,
+    command: COMMANDS.BATTERY,
+  })
+  
+  // Read/write command
+  const { 
+    set: setHeartbeat, 
+    get: getHeartbeat, 
+    commandLoading: heartbeatLoading 
+  } = useCommand({
+    deviceId,
+    command: COMMANDS.HEARTBEAT,
+  })
+  
+  // Action-only command (no read capability)
+  const { set: reset } = useCommand({ 
+    deviceId, 
+    command: COMMANDS.RESET 
+  })
+  
+  const handleSetHeartbeat = () => {
+    setHeartbeat('60') // Set heartbeat to 60 seconds
+  }
+  
+  const handleReset = () => {
+    reset() // Trigger device reset
+  }
+  
+  return (
+    <View>
+      {batteryLoading ? (
+        <ActivityIndicator />
+      ) : (
+        <Text>Battery: {config.BATTERY?.value}%</Text>
+      )}
+      
+      <Button 
+        onPress={handleSetHeartbeat} 
+        loading={heartbeatLoading}
+      >
+        Set Heartbeat
+      </Button>
+    </View>
+  )
+}
+```
+
+## Props
+
+<ParamField path="deviceId" type="string" required>
+  The ID of the connected BLE device
+</ParamField>
+
+<ParamField path="command" type="Command" required>
+  The command object from `COMMANDS` enum. Each command defines:
+  - `name`: CommandNames enum value
+  - `readCommand`: Optional string for reading the value
+  - `writeCommand`: Optional function for writing values
+  - `readRegex`: Optional regex for parsing responses
+</ParamField>
+
+## Return Values
+
+<ResponseField name="set" type="(data?: string) => void">
+  Writes a value to the device for the specified command
+  
+  <ParamField path="data" type="string">
+    The value to write (format depends on the command)
+  </ParamField>
+  
+  - Automatically retries every 7 seconds if the write doesn't complete
+  - Times out after 10 seconds and updates configuration with an error
+  - Clears any pending retry timers when called
+</ResponseField>
+
+<ResponseField name="get" type="() => void">
+  Reads the current value from the device for the specified command
+  
+  - Only available if the command has a `readCommand` defined
+  - Automatically retries every 7 seconds
+  - Times out after 10 seconds
+  - Automatically called on hook initialization if no value is cached
+</ResponseField>
+
+<ResponseField name="commandLoading" type="boolean">
+  Indicates whether the command is currently being executed (reading or writing)
+</ResponseField>
+
+## Real-World Example
+
+From `TerminalScreen.tsx`, managing multiple device commands:
+
+<CodeGroup>
+```typescript Multiple Commands
+import { useCommand } from '../../hooks/useCommand'
+import { COMMANDS } from '../../ble/types'
+
+const Terminal = ({ deviceId }) => {
+  const configuration = useAppSelector((state) => state.configuration)
+  const config = configuration[deviceId]
+  
+  // Read-only commands
+  const { get: getBattery, commandLoading: batteryLoading } = useCommand({
+    deviceId,
+    command: COMMANDS.BATTERY,
+  })
+  
+  const { get: getVersion, commandLoading: versionLoading } = useCommand({
+    deviceId,
+    command: COMMANDS.VERSION,
+  })
+  
+  const { get: getDevice, commandLoading: deviceLoading } = useCommand({
+    deviceId,
+    command: COMMANDS.DEVICE,
+  })
+  
+  // Read/write commands
+  const { set: setHeartbeat, commandLoading: hbLoading } = useCommand({
+    deviceId,
+    command: COMMANDS.HEARTBEAT,
+  })
+  
+  const { set: setSensor, commandLoading: sensorLoading } = useCommand({
+    deviceId,
+    command: COMMANDS.SENSOR,
+  })
+  
+  // Action-only commands
+  const { set: reset } = useCommand({ 
+    deviceId, 
+    command: COMMANDS.RESET 
+  })
+  
+  const { set: erase } = useCommand({ 
+    deviceId, 
+    command: COMMANDS.ERASE 
+  })
+  
+  const { set: triggerDfu } = useCommand({
+    deviceId,
+    command: COMMANDS.DFU,
+  })
+  
+  return (
+    <View>
+      <Text>Battery: {config?.BATTERY?.value}%</Text>
+      <Text>Version: {config?.VERSION?.value}</Text>
+      <Text>Device: {config?.DEVICE?.value}</Text>
+      
+      <Button 
+        onPress={() => setHeartbeat('60')} 
+        loading={hbLoading}
+      >
+        Set Heartbeat to 60s
+      </Button>
+      
+      <Button 
+        onPress={() => setSensor('enable')} 
+        loading={sensorLoading}
+      >
+        Enable Sensor
+      </Button>
+      
+      <Button onPress={() => reset()}>Reset Device</Button>
+      <Button onPress={() => erase()}>Erase Data</Button>
+      <Button onPress={() => triggerDfu()}>Enter DFU Mode</Button>
+    </View>
+  )
+}
+```
+
+```typescript Command Types
+// Different command types from COMMANDS
+
+// Read-only: has readCommand and readRegex
+COMMANDS.BATTERY = {
+  name: CommandNames.BATTERY,
+  readCommand: 'battery',
+  readRegex: /\bBattery\s=\s(100|\d{1,3})%/,
+}
+
+// Read/write: has all properties
+COMMANDS.SENSOR = {
+  name: CommandNames.SENSOR,
+  readCommand: 'status',
+  readRegex: /Trap: (\w+). Sensor: (enabled|disabled)./,
+  writeCommand: (value?: string) => `${value}`,
+}
+
+// Action-only: no readCommand or readRegex
+COMMANDS.RESET = {
+  name: CommandNames.RESET,
+  // No read capabilities
+}
+```
+</CodeGroup>
+
+## Behavior Details
+
+### Automatic Reading
+
+On initialization, the hook automatically calls `get()` if:
+- The command has a `readCommand` defined
+- No cached value exists in the Redux store
+- The configuration doesn't match the expected goal
+
+### Retry Logic
+
+- Both `get()` and `set()` retry every **7 seconds** (INTERVAL = 1000 * 7)
+- Commands timeout after **10 seconds** (TIMEOUT = 1000 * 10)
+- On timeout, the configuration is updated with an error message
+- Retry timers are automatically cleared when commands complete successfully
+
+### State Management
+
+The hook integrates with Redux to:
+- Track command loading states
+- Store command values in device configuration
+- Update error states on timeout
+- Clear configuration when devices disconnect
+
+### Completion Detection
+
+A command is considered complete when:
+- For `set()`: The cached value matches the goal value
+- For `get()`: A non-empty value is received
+- The configuration is marked as loaded and not loading
+- No error is present
+
+## Command Configuration Access
+
+Access command values and state from Redux:
+
+```typescript
+const configuration = useAppSelector((state) => state.configuration)
+const deviceConfig = configuration[deviceId]
+
+// Access specific command data
+const batteryValue = deviceConfig?.BATTERY?.value // "85"
+const batteryLoaded = deviceConfig?.BATTERY?.loaded // true
+const batteryError = deviceConfig?.BATTERY?.error // undefined or error string
+```
+
+## Type Definitions
+
+```typescript
+type Props = {
+  deviceId: string
+  command: Command
+}
+
+type Command = {
+  name: CommandNames
+  readCommand?: string
+  writeCommand?: (value?: string) => string
+  readRegex?: RegExp
+}
+
+type ReturnType = {
+  set: (data?: string) => void
+  get: () => void
+  commandLoading: boolean
+}
+```
+
+## Common Command Examples
+
+```typescript
+// Available commands in COMMANDS enum:
+CommandNames.BATTERY      // Read battery percentage
+CommandNames.VERSION      // Read firmware version
+CommandNames.ID           // Read device ID
+CommandNames.DEVICE       // Read device type
+CommandNames.HEARTBEAT    // Read/write heartbeat interval
+CommandNames.SENSOR       // Read/write sensor state
+CommandNames.APPEUI       // Read/write LoRaWAN App EUI
+CommandNames.DEVEUI       // Read/write LoRaWAN Device EUI
+CommandNames.RESET        // Trigger device reset
+CommandNames.ERASE        // Erase device data
+CommandNames.DFU          // Enter DFU (firmware update) mode
+CommandNames.PING         // Send ping command
+```
+
+## Related
+
+- [useBle](/api/hooks/use-ble) - Low-level BLE communication hook
+- [BLE Types](../ble/types) - Command type definitions

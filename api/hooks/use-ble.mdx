@@ -1,0 +1,253 @@
+---
+title: 'useBle'
+description: 'Core BLE hook for managing Bluetooth Low Energy device connections, scanning, and data transfer'
+---
+
+## Overview
+
+The `useBle` hook is the heart of the Wildlife Watcher app's BLE functionality. It manages device scanning, connection/disconnection, data writing with a queuing system, and engine control for optimal BLE communication.
+
+## Import
+
+```typescript
+import { useBle } from '../hooks/useBle'
+```
+
+## Usage
+
+The hook is typically used through the `BleEngineProvider` context:
+
+```typescript
+import { useBleActions } from '../providers/BleEngineProvider'
+
+const MyComponent = () => {
+  const { 
+    startScan, 
+    connectDevice, 
+    disconnectDevice, 
+    write,
+    isBleConnecting 
+  } = useBleActions()
+
+  const handleScan = () => {
+    startScan(6) // Scan for 6 seconds
+  }
+
+  const handleConnect = async (device: ExtendedPeripheral) => {
+    const connected = await connectDevice(device, 15000)
+    if (connected.connected) {
+      console.log('Device connected successfully')
+    }
+  }
+
+  return (
+    // Your component JSX
+  )
+}
+```
+
+## Return Type
+
+The hook returns an object with the following properties and methods:
+
+<ResponseField name="isBleConnecting" type="boolean | undefined">
+  Indicates whether a BLE connection is currently in progress
+</ResponseField>
+
+<ResponseField name="startScan" type="(length?: number) => void">
+  Initiates a BLE device scan
+  
+  <ParamField path="length" type="number" default="6">
+    Duration of the scan in seconds
+  </ParamField>
+</ResponseField>
+
+<ResponseField name="connectDevice" type="(peripheral: ExtendedPeripheral, timeout?: number) => Promise<ExtendedPeripheral>">
+  Connects to a BLE device and sets up notifications
+  
+  <ParamField path="peripheral" type="ExtendedPeripheral" required>
+    The device to connect to
+  </ParamField>
+  
+  <ParamField path="timeout" type="number">
+    Connection timeout in milliseconds
+  </ParamField>
+  
+  Returns the updated peripheral object with connection status
+</ResponseField>
+
+<ResponseField name="disconnectDevice" type="(peripheral: ExtendedPeripheral) => void">
+  Disconnects from a BLE device and clears the write queue
+  
+  <ParamField path="peripheral" type="ExtendedPeripheral" required>
+    The device to disconnect from
+  </ParamField>
+</ResponseField>
+
+<ResponseField name="write" type="(peripheral: ExtendedPeripheral, data: (string | WriteData)[]) => Promise<void>">
+  Writes data to a connected BLE device using a queuing system
+  
+  <ParamField path="peripheral" type="ExtendedPeripheral" required>
+    The target device
+  </ParamField>
+  
+  <ParamField path="data" type="(string | WriteData)[]" required>
+    Array of strings or command tuples to write. `WriteData` is a tuple: `[CommandNames, CommandConstructOptions]`
+  </ParamField>
+</ResponseField>
+
+<ResponseField name="enginePause" type="(toggle: boolean) => void">
+  Pauses or resumes the BLE write engine
+  
+  <ParamField path="toggle" type="boolean" required>
+    `true` to pause, `false` to resume
+  </ParamField>
+</ResponseField>
+
+<ResponseField name="pingsPause" type="(toggle: boolean) => void">
+  Pauses or resumes automatic ping requests
+  
+  <ParamField path="toggle" type="boolean" required>
+    `true` to pause, `false` to resume
+  </ParamField>
+</ResponseField>
+
+<ResponseField name="enginePaused" type="React.MutableRefObject<boolean>">
+  Ref indicating whether the BLE engine is currently paused
+</ResponseField>
+
+<ResponseField name="pingsPaused" type="React.MutableRefObject<boolean>">
+  Ref indicating whether pings are currently paused
+</ResponseField>
+
+## Real-World Example
+
+From `Deployments.tsx`, connecting and disconnecting devices:
+
+<CodeGroup>
+```typescript Deployments.tsx
+import { useBleActions } from '../../providers/BleEngineProvider'
+import { ExtendedPeripheral } from '../../redux/slices/devicesSlice'
+
+const Deployments = () => {
+  const { 
+    isBleConnecting, 
+    startScan, 
+    connectDevice, 
+    disconnectDevice 
+  } = useBleActions()
+  
+  const devices = useAppSelector((state) => state.devices)
+  const { isScanning } = useAppSelector((state) => state.scanning)
+  
+  const isBleBusy = isBleConnecting || isScanning
+  
+  const handleConnect = useCallback(
+    async (item: ExtendedPeripheral) => {
+      await connectDevice(item)
+    },
+    [connectDevice]
+  )
+  
+  const handleDisconnect = useCallback(
+    async (item: ExtendedPeripheral) => {
+      await disconnectDevice(item)
+    },
+    [disconnectDevice]
+  )
+  
+  const handleScan = () => {
+    startScan(6)
+  }
+  
+  return (
+    // Component UI
+  )
+}
+```
+
+```typescript Writing Commands
+import { useBleActions } from '../../providers/BleEngineProvider'
+import { CommandNames, CommandControlTypes } from '../../ble/types'
+
+const TerminalScreen = () => {
+  const { write, pingsPause } = useBleActions()
+  const device = useSelectDevice({ deviceId })
+  
+  const sendCommands = () => {
+    // Pause pings during configuration
+    pingsPause(true)
+    
+    // Write multiple commands
+    write(device, [
+      [CommandNames.BATTERY, { control: CommandControlTypes.READ }],
+      [CommandNames.VERSION, { control: CommandControlTypes.READ }],
+      [CommandNames.HEARTBEAT, { 
+        control: CommandControlTypes.WRITE, 
+        value: '60' 
+      }]
+    ])
+    
+    // Resume pings
+    pingsPause(false)
+  }
+  
+  return (
+    // Component UI
+  )
+}
+```
+</CodeGroup>
+
+## Key Features
+
+### Write Queue System
+
+The hook implements a sophisticated write queue system that:
+- Ensures commands are sent sequentially with proper delays
+- Prevents buffer overflow on the device
+- Supports ignorable commands (like pings) that can be skipped when the engine is busy
+- Uses a 500ms interval to process the queue
+
+### Connection Management
+
+- Prevents duplicate connection attempts for the same device
+- Automatically retrieves device services after connection
+- Sets up BLE notifications for receiving data
+- Implements automatic ping every 40 seconds to keep connections alive
+- Cleans up intervals on disconnection
+
+### Error Handling
+
+- Automatically disconnects devices on write failures
+- Implements timeouts for connection operations
+- Clears leftover cached peripherals on initialization
+
+## Type Definitions
+
+```typescript
+export type WriteData = [CommandNames, CommandConstructOptions]
+
+export type ReturnType = {
+  isBleConnecting: boolean | undefined
+  startScan: (length?: number) => void
+  connectDevice: (
+    peripheral: ExtendedPeripheral,
+    timeout?: number,
+  ) => Promise<ExtendedPeripheral>
+  disconnectDevice: (peripheral: ExtendedPeripheral) => void
+  write: (
+    peripheral: ExtendedPeripheral,
+    data: (string | WriteData)[],
+  ) => Promise<void>
+  enginePause: (toggle: boolean) => void
+  pingsPause: (toggle: boolean) => void
+  enginePaused: React.MutableRefObject<boolean>
+  pingsPaused: React.MutableRefObject<boolean>
+}
+```
+
+## Related
+
+- [useCommand](/api/hooks/use-command) - High-level hook for specific BLE commands
+- [BleEngineProvider](../providers/ble-engine-provider) - Context provider for BLE actions

@@ -1,0 +1,488 @@
+---
+title: 'Input Components'
+description: 'Form input components for collecting user data'
+---
+
+## WWTextInput
+
+A text input field with built-in validation, error handling, and icon support.
+
+### Props
+
+<ParamField path="value" type="string">
+  Current value of the input field
+</ParamField>
+
+<ParamField path="onChange" type="(value: string) => void">
+  Callback function called when text changes
+</ParamField>
+
+<ParamField path="placeholder" type="string">
+  Placeholder text displayed when input is empty
+</ParamField>
+
+<ParamField path="label" type="string">
+  Label text displayed above/inside the input
+</ParamField>
+
+<ParamField path="multiline" type="boolean" default="false">
+  Allows multiple lines of text input
+</ParamField>
+
+<ParamField path="hasError" type="boolean" default="false">
+  When true, displays error styling and icon
+</ParamField>
+
+<ParamField path="errorText" type="string">
+  Error message displayed below the input when `hasError` is true
+</ParamField>
+
+<ParamField path="disabled" type="boolean" default="false">
+  Disables the input and shows a lock icon
+</ParamField>
+
+<ParamField path="secureTextEntry" type="boolean" default="false">
+  Masks input text (for passwords)
+</ParamField>
+
+<ParamField path="right" type="React.ReactNode">
+  Custom right-side icon or component
+</ParamField>
+
+<ParamField path="style" type="StyleProp<ViewStyle>">
+  Custom styles for the input container
+</ParamField>
+
+### Type Definition
+
+```tsx
+export type WWTextInputProps = CommonProps & Omit<TextInputProps, 'onChange'>
+
+type CommonProps = {
+  multiline?: boolean
+  hasError?: boolean
+  onChange?: (value: string) => void
+  errorText?: string
+}
+```
+
+### Usage Examples
+
+<Tabs>
+  <Tab title="Basic Input">
+    ```tsx
+import { WWTextInput } from '@/components/ui'
+import { useState } from 'react'
+
+export const BasicInput = () => {
+  const [name, setName] = useState('')
+  
+  return (
+    <WWTextInput
+      label="Species Name"
+      placeholder="Enter species name"
+      value={name}
+      onChange={setName}
+    />
+  )
+}
+    ```
+  </Tab>
+  
+  <Tab title="With Validation">
+    ```tsx
+import { WWTextInput } from '@/components/ui'
+import { useState } from 'react'
+
+export const ValidatedInput = () => {
+  const [email, setEmail] = useState('')
+  const [error, setError] = useState(false)
+  
+  const handleChange = (value: string) => {
+    setEmail(value)
+    setError(!value.includes('@'))
+  }
+  
+  return (
+    <WWTextInput
+      label="Email"
+      value={email}
+      onChange={handleChange}
+      hasError={error}
+      errorText="Please enter a valid email address"
+    />
+  )
+}
+    ```
+  </Tab>
+  
+  <Tab title="Multiline">
+    ```tsx
+import { WWTextInput } from '@/components/ui'
+import { useState } from 'react'
+
+export const NotesInput = () => {
+  const [notes, setNotes] = useState('')
+  
+  return (
+    <WWTextInput
+      label="Observation Notes"
+      placeholder="Enter detailed observations..."
+      value={notes}
+      onChange={setNotes}
+      multiline
+      numberOfLines={4}
+    />
+  )
+}
+    ```
+  </Tab>
+  
+  <Tab title="Password">
+    ```tsx
+import { WWTextInput } from '@/components/ui'
+import { useState } from 'react'
+
+export const PasswordInput = () => {
+  const [password, setPassword] = useState('')
+  
+  return (
+    <WWTextInput
+      label="Password"
+      value={password}
+      onChange={setPassword}
+      secureTextEntry
+    />
+  )
+}
+    ```
+  </Tab>
+</Tabs>
+
+---
+
+## WWSelect
+
+A dropdown selection component for choosing from a list of options.
+
+### Props
+
+<ParamField path="label" type="string" required>
+  Label text for the dropdown
+</ParamField>
+
+<ParamField path="options" type="Option[]" required>
+  Array of options with `label` and `value` properties
+</ParamField>
+
+<ParamField path="value" type="string">
+  Currently selected value
+</ParamField>
+
+<ParamField path="onChange" type="(value: string) => void">
+  Callback function called when selection changes
+</ParamField>
+
+<ParamField path="onSelectEffect" type="(value: string) => void">
+  Additional callback for side effects when selection changes
+</ParamField>
+
+<ParamField path="hasError" type="boolean" default="false">
+  When true, displays error styling
+</ParamField>
+
+<ParamField path="errorText" type="string">
+  Error message displayed below the dropdown when `hasError` is true
+</ParamField>
+
+<ParamField path="disabled" type="boolean" default="false">
+  Disables the dropdown
+</ParamField>
+
+<ParamField path="style" type="StyleProp<ViewStyle>">
+  Custom styles for the dropdown container
+</ParamField>
+
+### Type Definition
+
+```tsx
+export type WWSelectProps = CommonProps & Omit<DropdownProps, 'onSelect' | 'options'>
+
+export type Option = {
+  label: string
+  value: string
+}
+
+type CommonProps = {
+  hasError?: boolean
+  onChange?: (value: string) => void
+  onSelectEffect?: (value: string) => void
+  errorText?: string
+  label: string
+  options: Option[]
+  style?: StyleProp<ViewStyle>
+}
+```
+
+### Usage Examples
+
+<Tabs>
+  <Tab title="Basic Select">
+    ```tsx
+import { WWSelect, Option } from '@/components/ui'
+import { useState } from 'react'
+
+const speciesOptions: Option[] = [
+  { label: 'Red Fox', value: 'red-fox' },
+  { label: 'Gray Wolf', value: 'gray-wolf' },
+  { label: 'Black Bear', value: 'black-bear' },
+]
+
+export const BasicSelect = () => {
+  const [species, setSpecies] = useState('')
+  
+  return (
+    <WWSelect
+      label="Select Species"
+      options={speciesOptions}
+      value={species}
+      onChange={setSpecies}
+    />
+  )
+}
+    ```
+  </Tab>
+  
+  <Tab title="With Side Effects">
+    ```tsx
+import { WWSelect, Option } from '@/components/ui'
+import { useState } from 'react'
+
+const habitatOptions: Option[] = [
+  { label: 'Forest', value: 'forest' },
+  { label: 'Grassland', value: 'grassland' },
+  { label: 'Wetland', value: 'wetland' },
+]
+
+export const SelectWithEffect = () => {
+  const [habitat, setHabitat] = useState('')
+  
+  const handleSelectEffect = (value: string) => {
+    console.log('Habitat selected:', value)
+    // Trigger additional actions
+  }
+  
+  return (
+    <WWSelect
+      label="Habitat Type"
+      options={habitatOptions}
+      value={habitat}
+      onChange={setHabitat}
+      onSelectEffect={handleSelectEffect}
+    />
+  )
+}
+    ```
+  </Tab>
+  
+  <Tab title="With Validation">
+    ```tsx
+import { WWSelect, Option } from '@/components/ui'
+import { useState } from 'react'
+
+const statusOptions: Option[] = [
+  { label: 'Active', value: 'active' },
+  { label: 'Inactive', value: 'inactive' },
+]
+
+export const ValidatedSelect = () => {
+  const [status, setStatus] = useState('')
+  const hasError = status === ''
+  
+  return (
+    <WWSelect
+      label="Status"
+      options={statusOptions}
+      value={status}
+      onChange={setStatus}
+      hasError={hasError}
+      errorText="Please select a status"
+    />
+  )
+}
+    ```
+  </Tab>
+</Tabs>
+
+---
+
+## WWCheckbox
+
+A checkbox input component with label support.
+
+### Props
+
+<ParamField path="value" type="boolean" default="false">
+  Current checked state of the checkbox
+</ParamField>
+
+<ParamField path="onChange" type="(value: boolean) => void">
+  Callback function called when checkbox state changes
+</ParamField>
+
+<ParamField path="label" type="string">
+  Label text displayed next to the checkbox
+</ParamField>
+
+<ParamField path="hasError" type="boolean" default="false">
+  When true, displays checkbox in error color (red)
+</ParamField>
+
+<ParamField path="errorText" type="string">
+  Error message (not displayed in current implementation)
+</ParamField>
+
+<ParamField path="disabled" type="boolean" default="false">
+  Disables the checkbox
+</ParamField>
+
+<ParamField path="style" type="StyleProp<ViewStyle>">
+  Custom styles for the checkbox container
+</ParamField>
+
+### Type Definition
+
+```tsx
+type Props = {
+  style?: StyleProp<ViewStyle>
+  hasError?: boolean
+  errorText?: string
+  value?: boolean
+  onChange?: (value: boolean) => void
+  label?: string
+} & Omit<CheckboxProps, 'status' | 'onPress'>
+```
+
+### Usage Examples
+
+<Tabs>
+  <Tab title="Basic Checkbox">
+    ```tsx
+import { WWCheckbox } from '@/components/ui'
+import { useState } from 'react'
+
+export const BasicCheckbox = () => {
+  const [agreed, setAgreed] = useState(false)
+  
+  return (
+    <WWCheckbox
+      label="I agree to the terms and conditions"
+      value={agreed}
+      onChange={setAgreed}
+    />
+  )
+}
+    ```
+  </Tab>
+  
+  <Tab title="Multiple Checkboxes">
+    ```tsx
+import { WWCheckbox } from '@/components/ui'
+import { useState } from 'react'
+import { View } from 'react-native'
+
+export const MultipleCheckboxes = () => {
+  const [mammals, setMammals] = useState(false)
+  const [birds, setBirds] = useState(false)
+  const [reptiles, setReptiles] = useState(false)
+  
+  return (
+    <View>
+      <WWCheckbox
+        label="Mammals"
+        value={mammals}
+        onChange={setMammals}
+      />
+      <WWCheckbox
+        label="Birds"
+        value={birds}
+        onChange={setBirds}
+      />
+      <WWCheckbox
+        label="Reptiles"
+        value={reptiles}
+        onChange={setReptiles}
+      />
+    </View>
+  )
+}
+    ```
+  </Tab>
+  
+  <Tab title="With Error State">
+    ```tsx
+import { WWCheckbox } from '@/components/ui'
+import { useState } from 'react'
+
+export const ValidatedCheckbox = () => {
+  const [accepted, setAccepted] = useState(false)
+  const [submitted, setSubmitted] = useState(false)
+  
+  const hasError = submitted && !accepted
+  
+  return (
+    <WWCheckbox
+      label="I have read and verified the data"
+      value={accepted}
+      onChange={setAccepted}
+      hasError={hasError}
+    />
+  )
+}
+    ```
+  </Tab>
+</Tabs>
+
+## Implementation Details
+
+### Source Code Locations
+
+- **WWTextInput**: `/workspace/source/src/components/ui/WWTextInput.tsx:16-67`
+- **WWSelect**: `/workspace/source/src/components/ui/WWSelect.tsx:24-69`
+- **WWCheckbox**: `/workspace/source/src/components/ui/WWCheckbox.tsx:15-47`
+
+### Automatic Icons
+
+WWTextInput automatically displays:
+- Lock icon when `disabled` is true
+- Alert circle icon (red) when `hasError` is true
+- Custom icon when `right` prop is provided
+
+### Form Integration
+
+All input components work seamlessly with form libraries like React Hook Form:
+
+```tsx
+import { useForm, Controller } from 'react-hook-form'
+import { WWTextInput, WWSelect, WWCheckbox } from '@/components/ui'
+
+export const FormExample = () => {
+  const { control, handleSubmit } = useForm()
+  
+  return (
+    <>
+      <Controller
+        control={control}
+        name="species"
+        render={({ field }) => (
+          <WWTextInput
+            label="Species"
+            value={field.value}
+            onChange={field.onChange}
+          />
+        )}
+      />
+    </>
+  )
+}
+```
